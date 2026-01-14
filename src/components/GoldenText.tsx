@@ -5,13 +5,16 @@ import * as THREE from "three";
 
 const fontUrl = 'https://raw.githubusercontent.com/mrdoob/three.js/master/examples/fonts/gentilis_bold.typeface.json';
 
-const goldMaterial = new THREE.MeshStandardMaterial({
-  color: new THREE.Color("#FFD700"),
-  emissive: new THREE.Color("#ffaa00"),
-  emissiveIntensity: 0.4,
-  metalness: 1.0,
-  roughness: 0.1,
-  envMapIntensity: 3.0,
+// --- UPGRADED REALISTIC GOLD MATERIAL ---
+const goldMaterial = new THREE.MeshPhysicalMaterial({
+  color: "#FFD700",        // Base Gold
+  metalness: 1,            // Fully metallic
+  roughness: 0.15,         // Slightly rough for realistic reflections
+  clearcoat: 1,            // Varnish layer on top for extra shine
+  clearcoatRoughness: 0.1, // Polish the varnish
+  emissive: "#ffaa00",     // Inner orange glow
+  emissiveIntensity: 0.5,  // Slight glow (Bloom will amplify this!)
+  reflectivity: 1,
 });
 
 const lerp = (start: number, end: number, factor: number) => start + (end - start) * factor;
@@ -33,10 +36,9 @@ export function GoldenText({ isActive }: { isActive: boolean }) {
     groupRef.current.position.y = lerp(groupRef.current.position.y, targetY, delta * 0.8);
 
     // 2. Scale Interpolation (Grow Smoothly)
-    // If active, scale to 1. If not, shrink to 0.
     const targetScale = isActive ? 1 : 0;
     const currentScale = groupRef.current.scale.x;
-    const newScale = lerp(currentScale, targetScale, delta * 2.0); // Faster scale for pop-up feel
+    const newScale = lerp(currentScale, targetScale, delta * 2.0); 
     
     groupRef.current.scale.set(newScale, newScale, newScale);
   });
@@ -58,9 +60,7 @@ export function GoldenText({ isActive }: { isActive: boolean }) {
       ref={groupRef} 
       position={[posX, startY, posZ]}
       rotation={[0, Math.PI / 2, 0]} 
-      // Initialize scale at 0 so it grows from nothing
       scale={[0, 0, 0]}
-      // Safety visibility toggle (prevents light calculation when deep underground)
       visible={isActive}
     >
       <Center top> 
@@ -74,6 +74,7 @@ export function GoldenText({ isActive }: { isActive: boolean }) {
         </Text3D>
       </Center>
       
+      {/* Lights tailored to make the Gold sparkle */}
       <pointLight 
         position={[0, 5, 10]}
         intensity={5.0} 

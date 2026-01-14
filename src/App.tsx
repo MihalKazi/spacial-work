@@ -1,5 +1,6 @@
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { Environment, OrbitControls, Html, useProgress } from "@react-three/drei";
+import { EffectComposer, Bloom, Vignette } from "@react-three/postprocessing"; // IMPORT POST PROCESSING
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Group } from "three";
 import { Vector3 } from "three";
@@ -46,7 +47,7 @@ const CANDLE_END_Y = 0;
 const CANDLE_DROP_DURATION = 1.2;
 const CANDLE_DROP_START = Math.max(CAKE_DESCENT_DURATION, TABLE_SLIDE_START + TABLE_SLIDE_DURATION) + 1.0;
 const totalAnimationTime = CANDLE_DROP_START + CANDLE_DROP_DURATION;
-const BACKGROUND_FADE_DURATION = 1.5; // Slower fade for smoothness
+const BACKGROUND_FADE_DURATION = 1.5; 
 const BACKGROUND_FADE_START = Math.max((Math.max(CANDLE_DROP_START, BACKGROUND_FADE_DURATION) - BACKGROUND_FADE_DURATION), 0);
 
 // --- SCRIPTS ---
@@ -80,7 +81,8 @@ function Loader() {
   return (
     <Html center>
       <div className="text-green-500 font-mono text-center" style={{ minWidth: '300px' }}>
-        <div className="text-xl mb-2">> DOWNLOADING ASSETS...</div>
+        {/* FIX: Change ">" to "{'>'}" */}
+        <div className="text-xl mb-2">{'>'} DOWNLOADING ASSETS...</div>
         <div className="text-4xl font-bold">{progress.toFixed(0)}%</div>
       </div>
     </Html>
@@ -88,19 +90,14 @@ function Loader() {
 }
 
 // --- HACKER TERMINAL ---
-// Now supports fading out internally
 function HackerTerminal({ onComplete }: { onComplete: () => void }) {
   const [lineIndex, setLineIndex] = useState(0);
-  const [isExiting, setIsExiting] = useState(false); // Controls opacity fade
+  const [isExiting, setIsExiting] = useState(false);
 
   useEffect(() => {
-    // If we've shown all lines...
     if (lineIndex >= TERMINAL_SCRIPT.length) {
-      // 1. Wait a moment to read the last line
       const readTimeout = setTimeout(() => {
-        // 2. Start fading out
         setIsExiting(true);
-        // 3. After fade completes (1s), trigger generic completion
         setTimeout(onComplete, 1000);
       }, 1500);
       return () => clearTimeout(readTimeout);
@@ -200,13 +197,11 @@ function AnimatedScene({ isPlaying, onBackgroundFadeChange, onEnvironmentProgres
         const elapsed = clock.elapsedTime - animationStartRef.current;
         const clampedElapsed = clamp(elapsed, 0, totalAnimationTime);
 
-        // Cake
         const cakeProgress = clamp(clampedElapsed / CAKE_DESCENT_DURATION, 0, 1);
         const cakeEase = easeOutCubic(cakeProgress);
         cake.position.y = lerp(CAKE_START_Y, CAKE_END_Y, cakeEase);
         cake.rotation.y = cakeEase * Math.PI * 2;
 
-        // Table
         let tableZ = TABLE_START_Z;
         if (clampedElapsed >= TABLE_SLIDE_START) {
             const tableProgress = clamp((clampedElapsed - TABLE_SLIDE_START) / TABLE_SLIDE_DURATION, 0, 1);
@@ -214,7 +209,6 @@ function AnimatedScene({ isPlaying, onBackgroundFadeChange, onEnvironmentProgres
         }
         table.position.z = tableZ;
 
-        // Candle
         if (clampedElapsed >= CANDLE_DROP_START) {
             if (!candle.visible) candle.visible = true;
             const candleProgress = clamp((clampedElapsed - CANDLE_DROP_START) / CANDLE_DROP_DURATION, 0, 1);
@@ -223,7 +217,6 @@ function AnimatedScene({ isPlaying, onBackgroundFadeChange, onEnvironmentProgres
             candle.visible = false; candle.position.y = CANDLE_START_Y;
         }
 
-        // Fade Logic
         if (clampedElapsed < BACKGROUND_FADE_START) { 
             emitBackgroundOpacity(1); 
             emitEnvironmentProgress(0); 
@@ -308,7 +301,7 @@ function EnvironmentBackgroundController({ intensity }: { intensity: number }) {
 // --- MAIN APP ---
 export default function App() {
   const [appStage, setAppStage] = useState<'terminal' | 'flight' | 'typing' | 'party'>('terminal');
-  const [typingFadingOut, setTypingFadingOut] = useState(false); // Controls opacity of typing stage
+  const [typingFadingOut, setTypingFadingOut] = useState(false); 
 
   const [backgroundOpacity, setBackgroundOpacity] = useState(1);
   const [environmentProgress, setEnvironmentProgress] = useState(0);
@@ -363,17 +356,12 @@ export default function App() {
     if (!isTypingStage) return;
 
     if (typingComplete) {
-      // 1. Wait a bit after typing is done
       const suspendHandle = window.setTimeout(() => {
-          // 2. Start Fading Out
           setTypingFadingOut(true);
-          
-          // 3. Wait for fade (1s), then switch stage
           setTimeout(() => {
              setAppStage('party');
              setTypingFadingOut(false);
           }, 1000);
-          
       }, POST_TYPING_SCENE_DELAY);
       return () => window.clearTimeout(suspendHandle);
     }
@@ -414,17 +402,14 @@ export default function App() {
   return (
     <div className="App">
       
-      {/* 1. HACKER TERMINAL (Phase 1) - Handles its own exit fade */}
       {appStage === 'terminal' && (
         <HackerTerminal onComplete={handleTerminalComplete} />
       )}
 
-      {/* 2. TYPING OVERLAY (Phase 3) */}
       {isTypingStage && (
         <div 
             className="fullscreen-overlay" 
             style={{ 
-                // We combine the scene background fade with the explicit exit fade
                 opacity: typingFadingOut ? 0 : backgroundOpacity, 
                 transition: 'opacity 1s ease-in-out' 
             }}
@@ -443,12 +428,10 @@ export default function App() {
         </div>
       )}
 
-      {/* Keep the Overlay Hidden during Party */}
       {appStage === 'party' && (
          <div className="fullscreen-overlay" style={{ opacity: 0, pointerEvents: 'none' }} />
       )}
       
-      {/* 3. INTERACTION UI (Phase 4: Party) */}
       <div 
         className="ui-layer" 
         style={{ 
@@ -469,7 +452,6 @@ export default function App() {
       >
         <Suspense fallback={<Loader />}>
           
-          {/* EARTH FLIGHT SCENE (Phase 2) */}
           {appStage === 'flight' && (
             <EarthIntro 
                 startLat={CURRENT_LAT}
@@ -480,7 +462,6 @@ export default function App() {
             />
           )}
 
-          {/* BIRTHDAY SCENE (Phase 3 background & Phase 4 Active) */}
           {(appStage === 'typing' || appStage === 'party') && (
             <>
               <AnimatedScene isPlaying={appStage === 'party'} candleLit={isCandleLit} onBackgroundFadeChange={setBackgroundOpacity} onEnvironmentProgressChange={setEnvironmentProgress} onAnimationComplete={() => setHasAnimationCompleted(true)} cards={BIRTHDAY_CARDS} activeCardId={activeCardId} onToggleCard={handleCardToggle} fireworksActive={fireworksActive} />
@@ -489,6 +470,12 @@ export default function App() {
               <Environment files={["/background.exr"]} backgroundRotation={[0, 3.3, 0]} environmentRotation={[0, 3.3, 0]} background environmentIntensity={0.2 * environmentProgress} backgroundIntensity={0.1 * environmentProgress} />
               <EnvironmentBackgroundController intensity={0.1 * environmentProgress} />
               <CinematiceCameraControls sceneStarted={appStage === 'party'} />
+              
+              {/* POST PROCESSING FOR GLOW */}
+              <EffectComposer disableNormalPass>
+                <Bloom luminanceThreshold={1} mipmapBlur intensity={1.5} radius={0.4} />
+                <Vignette eskil={false} offset={0.1} darkness={1.1} />
+              </EffectComposer>
             </>
           )}
         </Suspense>
