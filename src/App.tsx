@@ -1,5 +1,5 @@
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { Environment, OrbitControls, Html, useProgress } from "@react-three/drei";
+import { Environment, OrbitControls, Html, useProgress, useGLTF, useTexture } from "@react-three/drei";
 import { EffectComposer, Bloom, Vignette } from "@react-three/postprocessing"; 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Group } from "three";
@@ -21,6 +21,21 @@ import { GoldenText } from "./components/GoldenText";
 import { EarthIntro } from "./components/EarthIntro"; 
 
 import "./App.css";
+
+// --- 1. DRACO CONFIG & PRELOADING ---
+// This URL provides the decoder needed to "unzip" your compressed .glb files
+const DRACO_URL = "https://www.gstatic.com/draco/versioned/decoders/1.5.5/";
+
+useGLTF.preload("/candle.glb", DRACO_URL);
+useGLTF.preload("/cake.glb", DRACO_URL);
+useGLTF.preload("/table.glb", DRACO_URL);
+useGLTF.preload("/picture_frame.glb", DRACO_URL);
+// Note: If you renamed your compressed frame images to .webp, update these strings
+useTexture.preload("/frame1.jpg");
+useTexture.preload("/frame2.jpg");
+useTexture.preload("/frame3.jpg");
+useTexture.preload("/frame4.jpg");
+useTexture.preload("/card.png");
 
 // --- CONFIG ---
 const CURRENT_LAT = 23.8103;
@@ -91,6 +106,7 @@ function Loader() {
 function HackerTerminal({ onComplete }: { onComplete: () => void }) {
   const [lineIndex, setLineIndex] = useState(0);
   const [isExiting, setIsExiting] = useState(false);
+  const { progress } = useProgress();
 
   useEffect(() => {
     if (lineIndex >= TERMINAL_SCRIPT.length) {
@@ -101,9 +117,7 @@ function HackerTerminal({ onComplete }: { onComplete: () => void }) {
       return () => clearTimeout(readTimeout);
     }
     const currentLine = TERMINAL_SCRIPT[lineIndex];
-    const timeout = setTimeout(() => {
-      setLineIndex((prev) => prev + 1);
-    }, currentLine.delay);
+    const timeout = setTimeout(() => setLineIndex((prev) => prev + 1), currentLine.delay);
     return () => clearTimeout(timeout);
   }, [lineIndex, onComplete]);
 
@@ -116,6 +130,9 @@ function HackerTerminal({ onComplete }: { onComplete: () => void }) {
           </div>
         ))}
         {!isExiting && <div><span className="cursor"></span></div>}
+        <div style={{ marginTop: '20px', fontSize: '10px', color: '#113311' }}>
+          Background Sync: {progress.toFixed(0)}%
+        </div>
       </div>
     </div>
   );
@@ -227,6 +244,7 @@ function AnimatedScene({ isPlaying, onBackgroundFadeChange, onEnvironmentProgres
         <>
             <group ref={tableGroup}>
                 <Table />
+                {/* Updated to use .jpg as per your imports, change to .webp if you renamed them */}
                 <PictureFrame image="/frame2.jpg" position={[0, 0.735, 3]} rotation={[0, 5.6, 0]} scale={0.75} />
                 <PictureFrame image="/frame3.jpg" position={[0, 0.735, -3]} rotation={[0, 4.0, 0]} scale={0.75} />
                 <PictureFrame image="/frame4.jpg" position={[-1.5, 0.735, 2.5]} rotation={[0, 5.4, 0]} scale={0.75} />
@@ -275,7 +293,11 @@ function CinematiceCameraControls({ sceneStarted }: { sceneStarted: boolean }) {
     camera.lookAt(new Vector3().lerpVectors(START_CAM_TARGET, ORBIT_TARGET, ease));
     if (progress >= 1) {
       setIsSweeping(false);
-      if (controlsRef.current) { controlsRef.current.enabled = true; controlsRef.current.target.copy(ORBIT_TARGET); controlsRef.current.update(); }
+      if (controlsRef.current) { 
+        controlsRef.current.enabled = true; 
+        controlsRef.current.target.copy(ORBIT_TARGET); 
+        controlsRef.current.update(); 
+      }
     }
   });
 
@@ -303,11 +325,24 @@ export default function App() {
   const [fireworksActive, setFireworksActive] = useState(false);
   const [activeCardId, setActiveCardId] = useState<string | null>(null);
   const backgroundAudioRef = useRef<HTMLAudioElement | null>(null);
+  
+  const { progress } = useProgress();
 
   const handleTerminalComplete = useCallback(() => setAppStage('flight'), []);
-  const handleFlightComplete = useCallback(() => setAppStage('typing'), []);
+  
+  const handleFlightComplete = useCallback(() => {
+    if (progress >= 100) {
+      setAppStage('typing');
+    } else {
+      const check = setInterval(() => {
+        if (progress >= 100) {
+          setAppStage('typing');
+          clearInterval(check);
+        }
+      }, 100);
+    }
+  }, [progress]);
 
-  // Audio initialization
   useEffect(() => {
     const audio = new Audio("/music.mp3");
     audio.loop = true; 
@@ -319,7 +354,6 @@ export default function App() {
     };
   }, []);
 
-  // --- DYNAMIC TYPING LOGIC ---
   const isTypingStage = appStage === 'typing';
   const typingComplete = currentLineIndex >= TYPED_LINES.length;
 
@@ -378,17 +412,14 @@ export default function App() {
 
   return (
     <div className="App">
-      {/* 0. MOBILE ROTATION WARNING */}
       <div className="landscape-warning">
         <div className="phone-icon">📱🔄</div>
         <h2>PLEASE ROTATE DEVICE</h2>
         <p>For the best 3D experience, please use Landscape Mode</p>
       </div>
 
-      {/* 1. HACKER TERMINAL */}
       {appStage === 'terminal' && <HackerTerminal onComplete={handleTerminalComplete} />}
 
-      {/* 2. EARTH FLIGHT */}
       {appStage === 'flight' && (
          <div style={{ position: 'absolute', inset: 0, zIndex: 10 }}>
             <EarthIntro 
@@ -401,7 +432,6 @@ export default function App() {
          </div>
       )}
 
-      {/* 3. TYPING OVERLAY */}
       {isTypingStage && (
         <div className="fullscreen-overlay" style={{ opacity: typingFadingOut ? 0 : backgroundOpacity, transition: 'opacity 1s ease-in-out' }}>
           <div className="terminal-box">
@@ -418,16 +448,14 @@ export default function App() {
         </div>
       )}
 
-      {/* 4. PARTY UI */}
       <div className="ui-layer" style={{ opacity: hasAnimationCompleted && isCandleLit && appStage === 'party' ? 1 : 0, transition: 'opacity 1s ease-in-out', pointerEvents: hasAnimationCompleted && isCandleLit && appStage === 'party' ? 'auto' : 'none' }}>
           <div className="hint-overlay">Make a Wish</div>
           <button className="wish-button" onClick={blowCandle}>Tap to Blow Candle</button>
       </div>
       
-      {/* 5. MAIN 3D SCENE */}
       {(appStage === 'typing' || appStage === 'party') && (
         <Canvas
-          gl={{ alpha: true }}
+          gl={{ alpha: true, antialias: true, powerPreference: 'high-performance' }}
           style={{ background: 'transparent' }}
           onCreated={({ gl }) => { 
               gl.setClearColor("#000000", 0); 
@@ -455,6 +483,7 @@ export default function App() {
                 files={["/background.hdr"]} 
                 backgroundRotation={[0, 3.3, 0]} 
                 environmentRotation={[0, 3.3, 0]} 
+                blur={0.05}
                 background 
                 environmentIntensity={0.2 * environmentProgress} 
                 backgroundIntensity={0.1 * environmentProgress} 

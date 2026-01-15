@@ -1,35 +1,35 @@
-import { useLoader } from "@react-three/fiber";
-import type { ThreeElements } from "@react-three/fiber";
+import { useGLTF } from "@react-three/drei";
 import { useMemo } from "react";
+import type { ThreeElements } from "@react-three/fiber";
 import type { Group } from "three";
-import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 
 type CakeProps = ThreeElements["group"];
 
 export function Cake({ children, ...groupProps }: CakeProps) {
-  // Make sure your chicken file is named "cake.glb" inside the public folder
-  const gltf = useLoader(GLTFLoader, "/cake.glb");
+  // 1. Path to your compressed model
+  // 2. Path to the Draco Decoder (Google's CDN)
+  const { scene } = useGLTF(
+    "/cake.glb", 
+    "https://www.gstatic.com/draco/versioned/decoders/1.5.5/"
+  );
   
-  const cakeScene = useMemo<Group | null>(() => gltf.scene?.clone(true) ?? null, [gltf.scene]);
-
-  if (!cakeScene) {
-    return null;
-  }
+  // Clone the scene so we can use it safely without affecting other instances
+  const cakeScene = useMemo<Group>(() => scene.clone(true), [scene]);
 
   return (
-    <group {...groupProps}>
-      {/* CHANGE THESE NUMBERS TO FIX THE CHICKEN:
-         1. scale: Controls size (try 2, 5, or 10 if it's small)
-         2. position: [x, y, z] -> Middle number moves it Up/Down
-         3. rotation: [x, y, z] -> Middle number spins it around
-      */}
+    <group {...groupProps} dispose={null}>
       <primitive 
         object={cakeScene} 
         scale={2.5} 
-        position={[0, .8, 0]} 
+        position={[0, 0.8, 0]} 
         rotation={[0, 0, 0]} 
+        castShadow
+        receiveShadow
       />
       {children}
     </group>
   );
 }
+
+// Pre-fetching for smoother performance
+useGLTF.preload("/cake.glb", "https://www.gstatic.com/draco/versioned/decoders/1.5.5/");
