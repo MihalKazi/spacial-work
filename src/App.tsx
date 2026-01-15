@@ -350,7 +350,6 @@ export default function App() {
   const ambientAudioRef = useRef<HTMLAudioElement | null>(null);
   const { progress } = useProgress();
   
-  // 1. ASSET SYNC STARTS ON MOUNT
   useEffect(() => {
     preloadAssets();
     ambientAudioRef.current = new Audio("/ambient_night.mp3");
@@ -358,7 +357,6 @@ export default function App() {
     if (ambientAudioRef.current) { ambientAudioRef.current.loop = true; ambientAudioRef.current.volume = 0.5; }
   }, []);
 
-  // 2. STAGE MANAGEMENT
   useEffect(() => {
     if (appStage === 'typing') {
       if (currentLineIndex >= TYPED_LINES.length) {
@@ -376,7 +374,6 @@ export default function App() {
     }
   }, [appStage, currentLineIndex, currentCharIndex]);
 
-  // 3. AUTO-START PARTY WHEN READY
   useEffect(() => {
     if (appStage === 'preparing' && progress === 100) {
       const timer = setTimeout(() => {
@@ -408,20 +405,16 @@ export default function App() {
   return (
     <div className="App" style={{ height: '100dvh', width: '100vw', overflow: 'hidden', position: 'fixed', background: '#000' }}>
       
-      {/* LOADING OVERLAYS */}
       <PrepOverlay progress={progress} isVisible={appStage === 'preparing'} />
 
-      {/* 1. Terminal Phase */}
       {appStage === 'terminal' && <HackerTerminal onComplete={() => setAppStage('flight')} />}
       
-      {/* 2. Flight Phase */}
       {appStage === 'flight' && (
         <Suspense fallback={<div style={{color:'#0f0', padding: '20px'}}>Syncing Warp Drive...</div>}>
             <EarthIntro startLat={CURRENT_LAT} startLon={CURRENT_LON} targetLat={TARGET_LAT} targetLon={TARGET_LON} onComplete={() => setAppStage('typing')} />
         </Suspense>
       )}
 
-      {/* 3. Message Phase */}
       {appStage === 'typing' && (
         <div className="fullscreen-overlay" style={{ opacity: typingFadingOut ? 0 : 1, zIndex: 40 }}>
           <div className="terminal-box">
@@ -430,7 +423,6 @@ export default function App() {
         </div>
       )}
 
-      {/* 4. UI Layer */}
       <div className="ui-layer" style={{ 
         opacity: hasAnimationCompleted && isCandleLit && appStage === 'party' ? 1 : 0, 
         pointerEvents: isCandleLit ? 'auto' : 'none',
@@ -443,11 +435,18 @@ export default function App() {
           <button className="wish-button" onClick={blowCandle}>Blow Candle</button>
       </div>
       
-      {/* 5. 3D CANVAS */}
       {(appStage === 'preparing' || appStage === 'party') && (
         <Canvas 
           shadows 
-          gl={{ antialias: true, alpha: false, powerPreference: "high-performance" }}
+          // Performance Tuning for Low-End Devices
+          dpr={[1, 1.5]}
+          gl={{ 
+            antialias: false, // Turn off native AA as we use Bloom/Post-processing
+            powerPreference: "high-performance",
+            alpha: false,
+            stencil: false,
+            depth: true
+          }}
           style={{ opacity: appStage === 'party' ? 1 : 0, transition: 'opacity 2s ease' }}
           onPointerMissed={() => { setFocusTarget(null); setActiveCardId(null); }}
         >
@@ -458,7 +457,8 @@ export default function App() {
                 onBackgroundFadeChange={() => {}} 
                 onEnvironmentProgressChange={setEnvironmentProgress} 
                 onAnimationComplete={() => setHasAnimationCompleted(true)} 
-                cards={[{ id: "confetti", image: "/card.png", position: [1, 0.081, -2], rotation: [-Math.PI / 2, 0, Math.PI / 3] }]} 
+                // Adjusted position from 0.081 to 0.085 to prevent Z-fighting flicker
+                cards={[{ id: "confetti", image: "/card.png", position: [1, 0.085, -2], rotation: [-Math.PI / 2, 0, Math.PI / 3] }]} 
                 activeCardId={activeCardId}
                 onToggleCard={(id: string) => setActiveCardId(prev => (prev === id ? null : id))}
                 fireworksActive={fireworksActive} 
@@ -468,7 +468,8 @@ export default function App() {
             <Environment files={["/background.hdr"]} background environmentIntensity={0.2 * environmentProgress} backgroundIntensity={0.1 * environmentProgress} />
             <EnvironmentBackgroundController intensity={0.1 * environmentProgress} />
             <CinematiceCameraControls sceneStarted={appStage === 'party'} focusTarget={focusTarget} />
-            <EffectComposer enableNormalPass={false}>
+            {/* multisampling={0} prevents the "double-render" flicker on many browsers */}
+            <EffectComposer enableNormalPass={false} multisampling={0}>
                 <Bloom luminanceThreshold={1} mipmapBlur intensity={1.2} radius={0.3} />
             </EffectComposer>
           </Suspense>
