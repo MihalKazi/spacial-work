@@ -171,7 +171,7 @@ function PrepOverlay({ progress, isVisible }: { progress: number, isVisible: boo
       transition: 'opacity 0.8s ease'
     }}>
       <div style={{ color: '#0f0', fontFamily: 'monospace', textAlign: 'center' }}>
-        <div style={{ fontSize: '1.2rem', marginBottom: '10px' }}>[ RENDERING SCENE ]</div>
+        <div style={{ fontSize: '1.2rem', marginBottom: '10px' }}>[ HOLDUP MAXNET++ LOADING ]</div>
         <div style={{ width: '200px', height: '4px', background: '#113311' }}>
           <div style={{ width: `${progress}%`, height: '100%', background: '#0f0', transition: 'width 0.3s' }} />
         </div>
@@ -334,7 +334,7 @@ function CinematiceCameraControls({ sceneStarted, focusTarget }: { sceneStarted:
 
 // --- MAIN APP ---
 export default function App() {
-  const [appStage, setAppStage] = useState<'terminal' | 'flight' | 'typing' | 'preparing' | 'party'>('terminal');
+  const [appStage, setAppStage] = useState<'intro' | 'terminal' | 'flight' | 'typing' | 'preparing' | 'party'>('intro');
   const [typingFadingOut, setTypingFadingOut] = useState(false); 
   const [focusTarget, setFocusTarget] = useState<Vector3 | null>(null);
   
@@ -354,8 +354,16 @@ export default function App() {
     preloadAssets();
     ambientAudioRef.current = new Audio("/ambient_night.mp3");
     backgroundAudioRef.current = new Audio("/music.mp3");
-    if (ambientAudioRef.current) { ambientAudioRef.current.loop = true; ambientAudioRef.current.volume = 0.5; }
+    if (ambientAudioRef.current) { 
+        ambientAudioRef.current.loop = true; 
+        ambientAudioRef.current.volume = 0.5; 
+    }
   }, []);
+
+  const handleStart = () => {
+    setAppStage('terminal');
+    ambientAudioRef.current?.play().catch(e => console.error("Audio failed", e));
+  };
 
   useEffect(() => {
     if (appStage === 'typing') {
@@ -378,7 +386,6 @@ export default function App() {
     if (appStage === 'preparing' && progress === 100) {
       const timer = setTimeout(() => {
         setAppStage('party');
-        ambientAudioRef.current?.play().catch(() => {});
       }, 1500);
       return () => clearTimeout(timer);
     }
@@ -405,6 +412,21 @@ export default function App() {
   return (
     <div className="App" style={{ height: '100dvh', width: '100vw', overflow: 'hidden', position: 'fixed', background: '#000' }}>
       
+      {appStage === 'intro' && (
+        <div className="fullscreen-overlay" style={{ zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div className="terminal-box" style={{ textAlign: 'center', border: '1px solid #0f0' }}>
+                <div style={{ color: '#0f0', marginBottom: '20px', fontFamily: 'monospace' }}></div>
+                <button 
+                    onClick={handleStart}
+                    className="wish-button"
+                    style={{ background: 'transparent', border: '1px solid #0f0', color: '#0f0', cursor: 'pointer' }}
+                >
+                    RUN SecretMission++.exe
+                </button>
+            </div>
+        </div>
+      )}
+
       <PrepOverlay progress={progress} isVisible={appStage === 'preparing'} />
 
       {appStage === 'terminal' && <HackerTerminal onComplete={() => setAppStage('flight')} />}
@@ -438,10 +460,9 @@ export default function App() {
       {(appStage === 'preparing' || appStage === 'party') && (
         <Canvas 
           shadows 
-          // Performance Tuning for Low-End Devices
           dpr={[1, 1.5]}
           gl={{ 
-            antialias: false, // Turn off native AA as we use Bloom/Post-processing
+            antialias: false, 
             powerPreference: "high-performance",
             alpha: false,
             stencil: false,
@@ -457,7 +478,6 @@ export default function App() {
                 onBackgroundFadeChange={() => {}} 
                 onEnvironmentProgressChange={setEnvironmentProgress} 
                 onAnimationComplete={() => setHasAnimationCompleted(true)} 
-                // Adjusted position from 0.081 to 0.085 to prevent Z-fighting flicker
                 cards={[{ id: "confetti", image: "/card.png", position: [1, 0.085, -2], rotation: [-Math.PI / 2, 0, Math.PI / 3] }]} 
                 activeCardId={activeCardId}
                 onToggleCard={(id: string) => setActiveCardId(prev => (prev === id ? null : id))}
@@ -468,7 +488,6 @@ export default function App() {
             <Environment files={["/background.hdr"]} background environmentIntensity={0.2 * environmentProgress} backgroundIntensity={0.1 * environmentProgress} />
             <EnvironmentBackgroundController intensity={0.1 * environmentProgress} />
             <CinematiceCameraControls sceneStarted={appStage === 'party'} focusTarget={focusTarget} />
-            {/* multisampling={0} prevents the "double-render" flicker on many browsers */}
             <EffectComposer enableNormalPass={false} multisampling={0}>
                 <Bloom luminanceThreshold={1} mipmapBlur intensity={1.2} radius={0.3} />
             </EffectComposer>
