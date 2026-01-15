@@ -171,7 +171,7 @@ function PrepOverlay({ progress, isVisible }: { progress: number, isVisible: boo
       transition: 'opacity 0.8s ease'
     }}>
       <div style={{ color: '#0f0', fontFamily: 'monospace', textAlign: 'center' }}>
-        <div style={{ fontSize: '1.2rem', marginBottom: '10px' }}>[ HOLDUP MAXNET++ LOADING ]</div>
+        <div style={{ fontSize: '1.2rem', marginBottom: '10px' }}>[ RENDERING SCENE ]</div>
         <div style={{ width: '200px', height: '4px', background: '#113311' }}>
           <div style={{ width: `${progress}%`, height: '100%', background: '#0f0', transition: 'width 0.3s' }} />
         </div>
@@ -358,11 +358,16 @@ export default function App() {
         ambientAudioRef.current.loop = true; 
         ambientAudioRef.current.volume = 0.5; 
     }
+    if (backgroundAudioRef.current) {
+        backgroundAudioRef.current.volume = 0.8;
+    }
   }, []);
 
   const handleStart = () => {
     setAppStage('terminal');
     ambientAudioRef.current?.play().catch(e => console.error("Audio failed", e));
+    // Pre-load the second song silently to bypass mobile restrictions later
+    backgroundAudioRef.current?.load();
   };
 
   useEffect(() => {
@@ -396,13 +401,27 @@ export default function App() {
     return TYPED_LINES.map((line, idx) => idx < currentLineIndex ? line : idx === currentLineIndex ? line.slice(0, currentCharIndex) : "");
   }, [currentCharIndex, currentLineIndex, appStage]);
 
+  // --- MOBILE OPTIMIZED BLOW ---
   const blowCandle = useCallback(() => {
     if (hasAnimationCompleted && isCandleLit) {
       setIsCandleLit(false);
+      
+      // Stop the first song
+      ambientAudioRef.current?.pause();
+
+      // IMPORTANT FOR MOBILE: Play immediately to sync with the gesture
+      // We start it at volume 0 then fade up if needed, but it must play NOW.
+      const bgMusic = backgroundAudioRef.current;
+      if (bgMusic) {
+        bgMusic.play().then(() => {
+            console.log("Birthday music started successfully");
+        }).catch(err => {
+            console.warn("Mobile autoplay block, retrying on next interaction", err);
+        });
+      }
+
       setTimeout(() => {
         setFireworksActive(true);
-        ambientAudioRef.current?.pause();
-        backgroundAudioRef.current?.play().catch(() => {});
       }, 800);
     }
   }, [hasAnimationCompleted, isCandleLit]);
@@ -415,13 +434,13 @@ export default function App() {
       {appStage === 'intro' && (
         <div className="fullscreen-overlay" style={{ zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <div className="terminal-box" style={{ textAlign: 'center', border: '1px solid #0f0' }}>
-                <div style={{ color: '#0f0', marginBottom: '20px', fontFamily: 'monospace' }}></div>
+                <div style={{ color: '#0f0', marginBottom: '20px', fontFamily: 'monospace' }}>SECURE CONNECTION ESTABLISHED.</div>
                 <button 
                     onClick={handleStart}
                     className="wish-button"
                     style={{ background: 'transparent', border: '1px solid #0f0', color: '#0f0', cursor: 'pointer' }}
                 >
-                    RUN SecretMission++.exe
+                    RUN SurprizeProtocol.exe
                 </button>
             </div>
         </div>
@@ -454,6 +473,7 @@ export default function App() {
             🕯️ Make a Wish <br/>
             <span style={{ fontSize: '0.8rem', opacity: 0.7 }}>Blow or Tap</span>
           </div>
+          {/* We use onClick here to provide the "User Gesture" needed for mobile music to switch */}
           <button className="wish-button" onClick={blowCandle}>Blow Candle</button>
       </div>
       
