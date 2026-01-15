@@ -330,7 +330,7 @@ export default function App() {
   const [appStage, setAppStage] = useState<'terminal' | 'flight' | 'typing' | 'party'>('terminal');
   const [typingFadingOut, setTypingFadingOut] = useState(false); 
   const [focusTarget, setFocusTarget] = useState<Vector3 | null>(null);
-  const [backgroundOpacity, setBackgroundOpacity] = useState(1);
+  const [, setBackgroundOpacity] = useState(1);
   const [environmentProgress, setEnvironmentProgress] = useState(0);
   const [currentLineIndex, setCurrentLineIndex] = useState(0);
   const [currentCharIndex, setCurrentCharIndex] = useState(0);
