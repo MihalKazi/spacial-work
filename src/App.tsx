@@ -22,18 +22,20 @@ import { EarthIntro } from "./components/EarthIntro";
 
 import "./App.css";
 
-// --- 1. DRACO CONFIG & PRELOADING ---
+// --- 1. DRACO & ASSET PRELOADING ---
 const DRACO_URL = "https://www.gstatic.com/draco/versioned/decoders/1.5.5/";
 
-useGLTF.preload("/candle.glb", DRACO_URL);
-useGLTF.preload("/cake.glb", DRACO_URL);
-useGLTF.preload("/table.glb", DRACO_URL);
-useGLTF.preload("/picture_frame.glb", DRACO_URL);
-useTexture.preload("/frame1.jpg");
-useTexture.preload("/frame2.jpg");
-useTexture.preload("/frame3.jpg");
-useTexture.preload("/frame4.jpg");
-useTexture.preload("/card.png");
+const preloadAssets = () => {
+  useGLTF.preload("/candle.glb", DRACO_URL);
+  useGLTF.preload("/cake.glb", DRACO_URL);
+  useGLTF.preload("/table.glb", DRACO_URL);
+  useGLTF.preload("/picture_frame.glb", DRACO_URL);
+  useTexture.preload("/frame1.jpg");
+  useTexture.preload("/frame2.jpg");
+  useTexture.preload("/frame3.jpg");
+  useTexture.preload("/frame4.jpg");
+  useTexture.preload("/card.png");
+};
 
 // --- UTILS ---
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
@@ -66,16 +68,11 @@ function useMicrophone(onBlow: () => void, active: boolean) {
           let values = 0;
           for (let i = 0; i < bufferLength; i++) values += dataArray[i];
           const average = values / bufferLength;
-          if (average > 55) { // Sensitivity threshold
-            onBlow();
-          } else {
-            animationFrame = requestAnimationFrame(checkVolume);
-          }
+          if (average > 55) { onBlow(); } 
+          else { animationFrame = requestAnimationFrame(checkVolume); }
         };
         checkVolume();
-      } catch (err) {
-        console.warn("Mic access denied:", err);
-      }
+      } catch (err) { console.warn("Mic access denied:", err); }
     };
     initMic();
     return () => {
@@ -85,7 +82,7 @@ function useMicrophone(onBlow: () => void, active: boolean) {
   }, [active, onBlow]);
 }
 
-// --- CONFIG & CONSTANTS ---
+// --- CONSTANTS ---
 const CURRENT_LAT = 23.8103;
 const CURRENT_LON = 90.4125;
 const TARGET_LAT = -29.6823;
@@ -129,18 +126,7 @@ const TERMINAL_SCRIPT = [
 const TYPED_CHAR_DELAY = 40;        
 const POST_TYPING_SCENE_DELAY = 3000; 
 
-function Loader() {
-  const { progress } = useProgress();
-  return (
-    <Html center>
-      <div className="text-green-500 font-mono text-center" style={{ minWidth: '300px' }}>
-        <div className="text-xl mb-2">{'>'} DOWNLOADING ASSETS...</div>
-        <div className="text-4xl font-bold">{progress.toFixed(0)}%</div>
-      </div>
-    </Html>
-  );
-}
-
+// --- OVERLAYS ---
 function HackerTerminal({ onComplete }: { onComplete: () => void }) {
   const [lineIndex, setLineIndex] = useState(0);
   const [isExiting, setIsExiting] = useState(false);
@@ -160,7 +146,7 @@ function HackerTerminal({ onComplete }: { onComplete: () => void }) {
   }, [lineIndex, onComplete]);
 
   return (
-    <div className="fullscreen-overlay" style={{ opacity: isExiting ? 0 : 1, transition: 'opacity 1s ease-in-out', pointerEvents: isExiting ? 'none' : 'auto' }}>
+    <div className="fullscreen-overlay" style={{ opacity: isExiting ? 0 : 1, transition: 'opacity 1s ease-in-out', zIndex: 100 }}>
       <div className="terminal-box">
         {TERMINAL_SCRIPT.slice(0, lineIndex + 1).map((line, i) => (
           <div key={i} style={{ color: line.color || '#0f0', fontWeight: line.bold ? 'bold' : 'normal' }}>
@@ -176,6 +162,26 @@ function HackerTerminal({ onComplete }: { onComplete: () => void }) {
   );
 }
 
+function PrepOverlay({ progress, isVisible }: { progress: number, isVisible: boolean }) {
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 150, background: 'black',
+      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+      opacity: isVisible ? 1 : 0, pointerEvents: isVisible ? 'auto' : 'none',
+      transition: 'opacity 0.8s ease'
+    }}>
+      <div style={{ color: '#0f0', fontFamily: 'monospace', textAlign: 'center' }}>
+        <div style={{ fontSize: '1.2rem', marginBottom: '10px' }}>[ HOLDUP BRO ]</div>
+        <div style={{ width: '200px', height: '4px', background: '#113311' }}>
+          <div style={{ width: `${progress}%`, height: '100%', background: '#0f0', transition: 'width 0.3s' }} />
+        </div>
+        <div style={{ marginTop: '10px' }}>{progress.toFixed(0)}%</div>
+      </div>
+    </div>
+  );
+}
+
+// --- 3D COMPONENTS ---
 function FireworkFlash({ active, envProgress }: { active: boolean, envProgress: number }) {
   const lightRef = useRef<THREE.PointLight>(null);
   useFrame(({ clock }) => {
@@ -184,6 +190,12 @@ function FireworkFlash({ active, envProgress }: { active: boolean, envProgress: 
     }
   });
   return active ? <pointLight ref={lightRef} position={[0, 8, 0]} color="#FFD700" distance={20} /> : null;
+}
+
+function EnvironmentBackgroundController({ intensity }: { intensity: number }) {
+  const scene = useThree((state) => state.scene);
+  useEffect(() => { if ("backgroundIntensity" in scene) (scene as any).backgroundIntensity = intensity; }, [scene, intensity]);
+  return null;
 }
 
 function AnimatedScene({ isPlaying, onBackgroundFadeChange, onEnvironmentProgressChange, candleLit, onAnimationComplete, cards, activeCardId, onToggleCard, fireworksActive, onPhotoClick }: any) {
@@ -320,17 +332,12 @@ function CinematiceCameraControls({ sceneStarted, focusTarget }: { sceneStarted:
   return <OrbitControls ref={controlsRef} enableDamping dampingFactor={0.05} minDistance={2} maxDistance={30} />;
 }
 
-function EnvironmentBackgroundController({ intensity }: { intensity: number }) {
-  const scene = useThree((state) => state.scene);
-  useEffect(() => { if ("backgroundIntensity" in scene) (scene as any).backgroundIntensity = intensity; }, [scene, intensity]);
-  return null;
-}
-
+// --- MAIN APP ---
 export default function App() {
-  const [appStage, setAppStage] = useState<'terminal' | 'flight' | 'typing' | 'party'>('terminal');
+  const [appStage, setAppStage] = useState<'terminal' | 'flight' | 'typing' | 'preparing' | 'party'>('terminal');
   const [typingFadingOut, setTypingFadingOut] = useState(false); 
   const [focusTarget, setFocusTarget] = useState<Vector3 | null>(null);
-  const [, setBackgroundOpacity] = useState(1);
+  
   const [environmentProgress, setEnvironmentProgress] = useState(0);
   const [currentLineIndex, setCurrentLineIndex] = useState(0);
   const [currentCharIndex, setCurrentCharIndex] = useState(0);
@@ -338,22 +345,52 @@ export default function App() {
   const [isCandleLit, setIsCandleLit] = useState(true);
   const [fireworksActive, setFireworksActive] = useState(false);
   const [activeCardId, setActiveCardId] = useState<string | null>(null);
+  
   const backgroundAudioRef = useRef<HTMLAudioElement | null>(null);
   const ambientAudioRef = useRef<HTMLAudioElement | null>(null);
+  const { progress } = useProgress();
   
+  // 1. ASSET SYNC STARTS ON MOUNT
   useEffect(() => {
+    preloadAssets();
     ambientAudioRef.current = new Audio("/ambient_night.mp3");
     backgroundAudioRef.current = new Audio("/music.mp3");
     if (ambientAudioRef.current) { ambientAudioRef.current.loop = true; ambientAudioRef.current.volume = 0.5; }
-    if (backgroundAudioRef.current) { backgroundAudioRef.current.loop = true; }
   }, []);
 
-  useEffect(() => { if (appStage === 'party') ambientAudioRef.current?.play().catch(() => {}); }, [appStage]);
+  // 2. STAGE MANAGEMENT
+  useEffect(() => {
+    if (appStage === 'typing') {
+      if (currentLineIndex >= TYPED_LINES.length) {
+        setTimeout(() => {
+          setTypingFadingOut(true);
+          setTimeout(() => setAppStage('preparing'), 1000); // Trigger Prep Screen
+        }, POST_TYPING_SCENE_DELAY);
+      } else {
+        const timeout = setTimeout(() => {
+          if (currentCharIndex < (TYPED_LINES[currentLineIndex]?.length || 0)) setCurrentCharIndex(p => p + 1);
+          else { setCurrentLineIndex(p => p + 1); setCurrentCharIndex(0); }
+        }, TYPED_CHAR_DELAY);
+        return () => clearTimeout(timeout);
+      }
+    }
+  }, [appStage, currentLineIndex, currentCharIndex]);
 
-  const handleToggleCard = useCallback((id: string) => {
-    setActiveCardId(prev => (prev === id ? null : id));
-    if (activeCardId !== id) setFocusTarget(null);
-  }, [activeCardId]);
+  // 3. AUTO-START PARTY WHEN READY
+  useEffect(() => {
+    if (appStage === 'preparing' && progress === 100) {
+      const timer = setTimeout(() => {
+        setAppStage('party');
+        ambientAudioRef.current?.play().catch(() => {});
+      }, 1500);
+      return () => clearTimeout(timer);
+    }
+  }, [appStage, progress]);
+
+  const typedLines = useMemo(() => {
+    if (appStage !== 'typing') return [];
+    return TYPED_LINES.map((line, idx) => idx < currentLineIndex ? line : idx === currentLineIndex ? line.slice(0, currentCharIndex) : "");
+  }, [currentCharIndex, currentLineIndex, appStage]);
 
   const blowCandle = useCallback(() => {
     if (hasAnimationCompleted && isCandleLit) {
@@ -366,71 +403,64 @@ export default function App() {
     }
   }, [hasAnimationCompleted, isCandleLit]);
 
-  // ACTIVATE MICROPHONE BLOWING
   useMicrophone(blowCandle, appStage === 'party' && isCandleLit && hasAnimationCompleted);
 
-  const typingComplete = currentLineIndex >= TYPED_LINES.length;
-  const typedLines = useMemo(() => {
-    if (appStage !== 'typing') return [];
-    return TYPED_LINES.map((line, index) => {
-      if (typingComplete || index < currentLineIndex) return line;
-      if (index === currentLineIndex) return line.slice(0, currentCharIndex);
-      return "";
-    });
-  }, [currentCharIndex, currentLineIndex, typingComplete, appStage]);
-
-  useEffect(() => {
-    if (appStage !== 'typing') return;
-    if (typingComplete) {
-      setTimeout(() => {
-        setTypingFadingOut(true);
-        setTimeout(() => setAppStage('party'), 1000);
-      }, POST_TYPING_SCENE_DELAY);
-      return;
-    }
-    const timeout = setTimeout(() => {
-      if (currentCharIndex < (TYPED_LINES[currentLineIndex]?.length || 0)) setCurrentCharIndex(prev => prev + 1);
-      else { setCurrentLineIndex(prev => prev + 1); setCurrentCharIndex(0); }
-    }, TYPED_CHAR_DELAY);
-    return () => clearTimeout(timeout);
-  }, [currentCharIndex, currentLineIndex, typingComplete, appStage]);
-
   return (
-    <div className="App" style={{ height: '100dvh', width: '100vw', overflow: 'hidden', position: 'fixed' }}>
+    <div className="App" style={{ height: '100dvh', width: '100vw', overflow: 'hidden', position: 'fixed', background: '#000' }}>
+      
+      {/* LOADING OVERLAYS */}
+      <PrepOverlay progress={progress} isVisible={appStage === 'preparing'} />
+
+      {/* 1. Terminal Phase */}
       {appStage === 'terminal' && <HackerTerminal onComplete={() => setAppStage('flight')} />}
-      {appStage === 'flight' && <EarthIntro startLat={CURRENT_LAT} startLon={CURRENT_LON} targetLat={TARGET_LAT} targetLon={TARGET_LON} onComplete={() => setAppStage('typing')} />}
+      
+      {/* 2. Flight Phase */}
+      {appStage === 'flight' && (
+        <Suspense fallback={<div style={{color:'#0f0', padding: '20px'}}>Syncing Warp Drive...</div>}>
+            <EarthIntro startLat={CURRENT_LAT} startLon={CURRENT_LON} targetLat={TARGET_LAT} targetLon={TARGET_LON} onComplete={() => setAppStage('typing')} />
+        </Suspense>
+      )}
+
+      {/* 3. Message Phase */}
       {appStage === 'typing' && (
-        <div className="fullscreen-overlay" style={{ opacity: typingFadingOut ? 0 : 1 }}>
+        <div className="fullscreen-overlay" style={{ opacity: typingFadingOut ? 0 : 1, zIndex: 40 }}>
           <div className="terminal-box">
             {typedLines.map((line, idx) => <div key={idx}>{line}{idx === currentLineIndex && <span className="cursor"></span>}</div>)}
           </div>
         </div>
       )}
 
+      {/* 4. UI Layer */}
       <div className="ui-layer" style={{ 
         opacity: hasAnimationCompleted && isCandleLit && appStage === 'party' ? 1 : 0, 
         pointerEvents: isCandleLit ? 'auto' : 'none',
-        display: 'flex', flexDirection: 'column', alignItems: 'center', transition: 'opacity 1s ease'
+        zIndex: 60, transition: 'opacity 1s ease'
       }}>
           <div style={{ color: 'white', marginBottom: '10px', textShadow: '0 0 10px #00ff00', textAlign: 'center' }}>
             🕯️ Make a Wish <br/>
-            <span style={{ fontSize: '0.8rem', opacity: 0.7 }}>Blow into mic or tap button</span>
+            <span style={{ fontSize: '0.8rem', opacity: 0.7 }}>Blow or Tap</span>
           </div>
           <button className="wish-button" onClick={blowCandle}>Blow Candle</button>
       </div>
       
-      {(appStage === 'typing' || appStage === 'party') && (
-        <Canvas shadows onPointerMissed={() => { setFocusTarget(null); setActiveCardId(null); }}>
-          <Suspense fallback={<Loader />}>
+      {/* 5. 3D CANVAS */}
+      {(appStage === 'preparing' || appStage === 'party') && (
+        <Canvas 
+          shadows 
+          gl={{ antialias: true, alpha: false, powerPreference: "high-performance" }}
+          style={{ opacity: appStage === 'party' ? 1 : 0, transition: 'opacity 2s ease' }}
+          onPointerMissed={() => { setFocusTarget(null); setActiveCardId(null); }}
+        >
+          <Suspense fallback={null}>
             <AnimatedScene 
                 isPlaying={appStage === 'party'} 
                 candleLit={isCandleLit} 
-                onBackgroundFadeChange={setBackgroundOpacity} 
+                onBackgroundFadeChange={() => {}} 
                 onEnvironmentProgressChange={setEnvironmentProgress} 
                 onAnimationComplete={() => setHasAnimationCompleted(true)} 
                 cards={[{ id: "confetti", image: "/card.png", position: [1, 0.081, -2], rotation: [-Math.PI / 2, 0, Math.PI / 3] }]} 
                 activeCardId={activeCardId}
-                onToggleCard={handleToggleCard}
+                onToggleCard={(id: string) => setActiveCardId(prev => (prev === id ? null : id))}
                 fireworksActive={fireworksActive} 
                 onPhotoClick={setFocusTarget}
             />
@@ -438,7 +468,9 @@ export default function App() {
             <Environment files={["/background.hdr"]} background environmentIntensity={0.2 * environmentProgress} backgroundIntensity={0.1 * environmentProgress} />
             <EnvironmentBackgroundController intensity={0.1 * environmentProgress} />
             <CinematiceCameraControls sceneStarted={appStage === 'party'} focusTarget={focusTarget} />
-            <EffectComposer><Bloom luminanceThreshold={1} mipmapBlur intensity={1.2} radius={0.3} /></EffectComposer>
+            <EffectComposer disableNormalPass>
+                <Bloom luminanceThreshold={1} mipmapBlur intensity={1.2} radius={0.3} />
+            </EffectComposer>
           </Suspense>
         </Canvas>
       )}
