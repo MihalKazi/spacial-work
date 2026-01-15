@@ -43,7 +43,8 @@ export function Moon({ isActive }: { isActive: boolean }) {
   const startPos = new THREE.Vector3(-40, 50, 0);
   const endPos = new THREE.Vector3(-40, 12, 0);
 
-  useFrame((state, delta) => {
+  // FIX: Renamed 'state' to '_state' so TypeScript ignores it
+  useFrame((_state, delta) => {
     if (!groupRef.current || !mainLightRef.current || !hemiLightRef.current || !tableSpotRef.current) return;
 
     // 1. ANIMATION
@@ -65,9 +66,7 @@ export function Moon({ isActive }: { isActive: boolean }) {
     const targetSpot = isActive ? 4.0 : 0;
     tableSpotRef.current.intensity = lerp(tableSpotRef.current.intensity, targetSpot, fadeSpeed);
 
-    // Atmosphere (THE FIX):
-    // Intensity boosted to 2.5 to lift all shadows.
-    // This creates "Global Illumination" feel.
+    // Atmosphere (Global Illumination feel)
     const targetHemi = isActive ? 2.5 : 0;
     hemiLightRef.current.intensity = lerp(hemiLightRef.current.intensity, targetHemi, fadeSpeed);
   });

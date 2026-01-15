@@ -483,7 +483,7 @@ export default function App() {
             <EnvironmentBackgroundController intensity={0.1 * environmentProgress} />
             <CinematiceCameraControls sceneStarted={appStage === 'party'} />
             
-            <EffectComposer disableNormalPass>
+           <EffectComposer> {/* REMOVED disableNormalPass here */}
               <Bloom luminanceThreshold={1} mipmapBlur intensity={1.5} radius={0.4} />
               <Vignette eskil={false} offset={0.1} darkness={1.1} />
             </EffectComposer>

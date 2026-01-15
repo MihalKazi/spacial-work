@@ -88,32 +88,38 @@ export function Glitter({ isActive }: { isActive: boolean }) {
   if (!isActive) return null;
 
   return (
-    <points ref={meshRef}>
-      <bufferGeometry>
-        <bufferAttribute
-          attach="attributes-position"
-          count={count}
-          array={particles.positions}
-          itemSize={3}
+    <group>
+        <points ref={meshRef}>
+        <bufferGeometry>
+            {/* FIXED: Added args={[particles.positions, 3]} to satisfy TypeScript */}
+            <bufferAttribute
+                attach="attributes-position"
+                count={count}
+                array={particles.positions}
+                itemSize={3}
+                args={[particles.positions, 3]} 
+            />
+            {/* FIXED: Added args={[particles.colors, 3]} to satisfy TypeScript */}
+            <bufferAttribute
+                attach="attributes-color"
+                count={count}
+                array={particles.colors}
+                itemSize={3}
+                args={[particles.colors, 3]} 
+            />
+        </bufferGeometry>
+        <pointsMaterial
+            map={starTexture}
+            size={0.15}
+            vertexColors
+            transparent
+            opacity={0.9}
+            sizeAttenuation={true}
+            blending={THREE.AdditiveBlending}
+            depthWrite={false}
+            alphaTest={0.5}
         />
-        <bufferAttribute
-          attach="attributes-color"
-          count={count}
-          array={particles.colors}
-          itemSize={3}
-        />
-      </bufferGeometry>
-      <pointsMaterial
-        map={starTexture} // <-- Apply the star texture here
-        size={0.15}       // <-- Reduced size (was 0.4)
-        vertexColors
-        transparent
-        opacity={0.9}
-        sizeAttenuation={true}
-        blending={THREE.AdditiveBlending}
-        depthWrite={false}
-        alphaTest={0.5} // Helps cut out the transparent parts of the texture
-      />
-    </points>
+        </points>
+    </group>
   );
 }
