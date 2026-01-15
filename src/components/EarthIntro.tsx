@@ -86,7 +86,7 @@ export function EarthIntro({ startLat, startLon, targetLat, targetLon, onComplet
         zIndex: 20
       }}>
         <h2 style={{ fontSize: '24px', margin: 0 }}>FLIGHT PROTOCOL INITIATED</h2>
-        <p>Trajectory: DHAKA {'->'} SOUTH AFRICA</p>
+        <p>Trajectory: KHULNA, BD {'->'} NORHTERN CAPE, SA</p>
         <p>Speed: MACH 10</p>
         {showLabel && <h1 style={{ color: 'white', fontSize: '40px', textShadow: '0 0 10px #fff' }}>ARRIVED</h1>}
       </div>

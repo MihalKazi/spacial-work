@@ -27,10 +27,10 @@ type BirthdayCardProps = {
   children?: ReactNode;
 };
 
-const CARD_SCALE = 0.25;
-const CARD_WIDTH = 4 * CARD_SCALE;
-const CARD_HEIGHT = 3 * CARD_SCALE;
-const CAMERA_DISTANCE = 1.2;
+// --- CONSTANTS ---
+const BASE_SCALE = 0.25;
+const CARD_WIDTH = 4;  // Base units
+const CARD_HEIGHT = 3; // Base units
 const CAMERA_Y_FLOOR = 0.8;
 const HOVER_LIFT = 0.04;
 
@@ -44,40 +44,33 @@ export function BirthdayCard({
   children,
 }: BirthdayCardProps) {
   const groupRef = useRef<Group>(null);
-  const { camera } = useThree();
+  const meshScalerRef = useRef<Group>(null);
+  const { camera, size } = useThree();
   const [isHovered, setIsHovered] = useState(false);
+
+  // --- RESPONSIVE LOGIC ---
+  // If width is less than 1000px (laptops/tablets), we make the card "pop" more.
+  const isSmallScreen = size.width < 1100;
+  
+  // 1. Move it closer to camera on smaller screens
+  const dynamicDistance = isSmallScreen ? 0.85 : 1.2;
+  
+  // 2. Increase the physical size of the card when active
+  const activeScaleFactor = isSmallScreen ? 1.35 : 1.1;
 
   useCursor(isHovered || isActive, "pointer");
 
   const texture = useTexture(image);
   useEffect(() => {
     texture.colorSpace = SRGBColorSpace;
-    texture.anisotropy = 4;
+    texture.anisotropy = 8; // Higher quality for text/images
   }, [texture]);
 
-  const defaultPosition = useMemo(
-    () => new Vector3(...tablePosition),
-    [tablePosition]
-  );
+  const defaultPosition = useMemo(() => new Vector3(...tablePosition), [tablePosition]);
   const defaultQuaternion = useMemo(() => {
     const euler = new Euler(...tableRotation);
     return new Quaternion().setFromEuler(euler);
   }, [tableRotation]);
-
-  useEffect(() => {
-    const group = groupRef.current;
-    if (!group) {
-      return;
-    }
-    group.position.copy(defaultPosition);
-    group.quaternion.copy(defaultQuaternion);
-  }, [defaultPosition, defaultQuaternion]);
-
-  useEffect(() => {
-    if (!isActive) {
-      setIsHovered(false);
-    }
-  }, [isActive]);
 
   const tmpPosition = useMemo(() => new Vector3(), []);
   const tmpQuaternion = useMemo(() => new Quaternion(), []);
@@ -86,31 +79,39 @@ export function BirthdayCard({
 
   useFrame((_, delta) => {
     const group = groupRef.current;
-    if (!group) {
-      return;
-    }
+    const meshScaler = meshScalerRef.current;
+    if (!group || !meshScaler) return;
 
     const positionTarget = tmpPosition;
     const rotationTarget = tmpQuaternion;
 
+    // --- SMOOTH SCALING ---
+    const targetScale = isActive 
+        ? BASE_SCALE * activeScaleFactor 
+        : BASE_SCALE;
+    
+    // Lerp the scale for a smooth "pop-up" effect
+    meshScaler.scale.lerp(new Vector3(targetScale, targetScale, targetScale), 0.15);
+
+    // --- MOVEMENT LOGIC ---
     if (isActive) {
+      // Follow Camera
       positionTarget.copy(camera.position);
       positionTarget.add(
         tmpDirection
           .copy(camera.getWorldDirection(tmpDirection))
-          .multiplyScalar(CAMERA_DISTANCE)
+          .multiplyScalar(dynamicDistance)
       );
       positionTarget.add(cameraOffset);
+
       if (positionTarget.y < CAMERA_Y_FLOOR) {
         positionTarget.y = CAMERA_Y_FLOOR;
       }
-
       rotationTarget.copy(camera.quaternion);
     } else {
+      // Stay on Table
       positionTarget.copy(defaultPosition);
-      if (isHovered) {
-        positionTarget.y += HOVER_LIFT;
-      }
+      if (isHovered) positionTarget.y += HOVER_LIFT;
       rotationTarget.copy(defaultQuaternion);
     }
 
@@ -121,40 +122,28 @@ export function BirthdayCard({
     group.quaternion.slerp(rotationTarget, slerpAlpha);
   });
 
-  const handlePointerOver = useCallback(
-    (event: ThreeEvent<PointerEvent>) => {
-      event.stopPropagation();
-      if (!isActive) {
-        setIsHovered(true);
-      }
-    },
-    [isActive]
-  );
+  const handlePointerOver = useCallback((e: ThreeEvent<PointerEvent>) => {
+    e.stopPropagation();
+    if (!isActive) setIsHovered(true);
+  }, [isActive]);
 
-  const handlePointerOut = useCallback((event: ThreeEvent<PointerEvent>) => {
-    event.stopPropagation();
+  const handlePointerOut = useCallback((e: ThreeEvent<PointerEvent>) => {
+    e.stopPropagation();
     setIsHovered(false);
   }, []);
 
-  const handlePointerDown = useCallback((event: ThreeEvent<PointerEvent>) => {
-    event.stopPropagation();
-  }, []);
-
-  const handleClick = useCallback(
-    (event: ThreeEvent<MouseEvent>) => {
-      event.stopPropagation();
-      onToggle(id);
-    },
-    [id, onToggle]
-  );
+  const handleClick = useCallback((e: ThreeEvent<MouseEvent>) => {
+    e.stopPropagation();
+    onToggle(id);
+  }, [id, onToggle]);
 
   return (
     <group ref={groupRef}>
-      <group rotation={[0, 0, 0]}>
+      {/* Inner group used strictly for the scaling animation */}
+      <group ref={meshScalerRef} scale={BASE_SCALE}>
         <mesh
           onPointerOver={handlePointerOver}
           onPointerOut={handlePointerOut}
-          onPointerDown={handlePointerDown}
           onClick={handleClick}
           castShadow
           receiveShadow
@@ -162,17 +151,21 @@ export function BirthdayCard({
           <planeGeometry args={[CARD_WIDTH, CARD_HEIGHT]} />
           <meshStandardMaterial
             map={texture}
-            roughness={0.35}
+            roughness={0.3}
             metalness={0.05}
             toneMapped={false}
           />
         </mesh>
+
+        {/* BACK OF CARD */}
         <mesh position={[0, 0, -0.001]} rotation={[0, Math.PI, 0]}>
           <planeGeometry args={[CARD_WIDTH, CARD_HEIGHT]} />
-          <meshStandardMaterial color="#f7f2ff" />
+          <meshStandardMaterial color="#fcfaff" roughness={0.5} />
         </mesh>
+
+        {/* CARD DEPTH/BORDER EFFECT */}
         <mesh position={[0, 0, -0.0008]}>
-          <planeGeometry args={[CARD_WIDTH * 0.98, CARD_HEIGHT * 0.98]} />
+          <planeGeometry args={[CARD_WIDTH * 0.99, CARD_HEIGHT * 0.99]} />
           <meshStandardMaterial
             color="#ffffff"
             side={DoubleSide}
@@ -180,6 +173,7 @@ export function BirthdayCard({
             metalness={0}
           />
         </mesh>
+        
         {children}
       </group>
     </group>
