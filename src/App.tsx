@@ -313,8 +313,13 @@ function CinematiceCameraControls({ sceneStarted, focusTarget }: { sceneStarted:
       if (sweepStartTime.current === null) sweepStartTime.current = clock.elapsedTime;
       const progress = Math.min((clock.elapsedTime - sweepStartTime.current) / CAMERA_SWOOP_DURATION, 1);
       const ease = easeInOutCubic(progress);
+      
       const finalPos = FINAL_CAM_POS_BASE.clone();
-      if (isPortrait) finalPos.add(new Vector3(2, 4, 10));
+      
+      // FIX: Increase the camera distance slightly more for portrait (mobile)
+      // to ensure the bottom of the table isn't cut off by Chrome's UI bars
+      if (isPortrait) finalPos.add(new Vector3(2.5, 4.5, 11)); 
+      
       camera.position.lerpVectors(START_CAM_POS, finalPos, ease);
       camera.lookAt(new Vector3().lerpVectors(START_CAM_TARGET, ORBIT_TARGET, ease));
       if (progress >= 1) setIsSweeping(false);
@@ -350,6 +355,14 @@ export default function App() {
   const ambientAudioRef = useRef<HTMLAudioElement | null>(null);
   const { progress } = useProgress();
   
+  // FIX: Force reset body margins to prevent clipping
+  useEffect(() => {
+    document.body.style.margin = '0';
+    document.body.style.padding = '0';
+    document.body.style.overflow = 'hidden';
+    document.body.style.touchAction = 'none'; // Prevents pull-to-refresh
+  }, []);
+
   useEffect(() => {
     preloadAssets();
     ambientAudioRef.current = new Audio("/ambient_night.mp3");
@@ -366,7 +379,6 @@ export default function App() {
   const handleStart = () => {
     setAppStage('terminal');
     ambientAudioRef.current?.play().catch(e => console.error("Audio failed", e));
-    // Pre-load the second song silently to bypass mobile restrictions later
     backgroundAudioRef.current?.load();
   };
 
@@ -401,25 +413,18 @@ export default function App() {
     return TYPED_LINES.map((line, idx) => idx < currentLineIndex ? line : idx === currentLineIndex ? line.slice(0, currentCharIndex) : "");
   }, [currentCharIndex, currentLineIndex, appStage]);
 
-  // --- MOBILE OPTIMIZED BLOW ---
   const blowCandle = useCallback(() => {
     if (hasAnimationCompleted && isCandleLit) {
       setIsCandleLit(false);
-      
-      // Stop the first song
       ambientAudioRef.current?.pause();
-
-      // IMPORTANT FOR MOBILE: Play immediately to sync with the gesture
-      // We start it at volume 0 then fade up if needed, but it must play NOW.
       const bgMusic = backgroundAudioRef.current;
       if (bgMusic) {
         bgMusic.play().then(() => {
             console.log("Birthday music started successfully");
         }).catch(err => {
-            console.warn("Mobile autoplay block, retrying on next interaction", err);
+            console.warn("Mobile autoplay block", err);
         });
       }
-
       setTimeout(() => {
         setFireworksActive(true);
       }, 800);
@@ -429,7 +434,15 @@ export default function App() {
   useMicrophone(blowCandle, appStage === 'party' && isCandleLit && hasAnimationCompleted);
 
   return (
-    <div className="App" style={{ height: '100dvh', width: '100vw', overflow: 'hidden', position: 'fixed', background: '#000' }}>
+    <div className="App" style={{ 
+        position: 'fixed', 
+        inset: '0',  // FIX: Anchors to all 4 corners 
+        width: '100%', 
+        height: '100%', 
+        overflow: 'hidden', 
+        background: '#000',
+        touchAction: 'none' // FIX: Disables scrolling on Chrome mobile
+    }}>
       
       {appStage === 'intro' && (
         <div className="fullscreen-overlay" style={{ zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -467,13 +480,14 @@ export default function App() {
       <div className="ui-layer" style={{ 
         opacity: hasAnimationCompleted && isCandleLit && appStage === 'party' ? 1 : 0, 
         pointerEvents: isCandleLit ? 'auto' : 'none',
-        zIndex: 60, transition: 'opacity 1s ease'
+        zIndex: 60, transition: 'opacity 1s ease',
+        // FIX: Ensure UI is not hidden behind iPhone home bar
+        paddingBottom: 'env(safe-area-inset-bottom)'
       }}>
           <div style={{ color: 'white', marginBottom: '10px', textShadow: '0 0 10px #00ff00', textAlign: 'center' }}>
             🕯️ Make a Wish <br/>
             <span style={{ fontSize: '0.8rem', opacity: 0.7 }}>Blow or Tap</span>
           </div>
-          {/* We use onClick here to provide the "User Gesture" needed for mobile music to switch */}
           <button className="wish-button" onClick={blowCandle}>Blow Candle</button>
       </div>
       
