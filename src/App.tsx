@@ -1,6 +1,6 @@
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { Environment, OrbitControls, Html, useProgress } from "@react-three/drei";
-import { EffectComposer, Bloom, Vignette } from "@react-three/postprocessing"; // IMPORT POST PROCESSING
+import { EffectComposer, Bloom, Vignette } from "@react-three/postprocessing"; 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Group } from "three";
 import { Vector3 } from "three";
@@ -8,6 +8,7 @@ import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 import * as THREE from "three";
 
 // --- COMPONENTS ---
+// Make sure these files exist in your src/models or src/components folders
 import { Candle } from "./models/candle";
 import { Cake } from "./models/cake";
 import { Table } from "./models/table";
@@ -18,14 +19,14 @@ import { Moon } from "./components/Moon";
 import { Aurora } from "./components/Aurora";
 import { BirthdayCard } from "./components/BirthdayCard";
 import { GoldenText } from "./components/GoldenText"; 
-import { EarthIntro } from "./components/EarthIntro"; 
+import { EarthIntro } from "./components/EarthIntro"; // The new Map Component
 
 import "./App.css";
 
 // --- CONFIG ---
-const CURRENT_LAT = 22.8456; 
-const CURRENT_LON = 89.5403;
-const TARGET_LAT = -29.6823; 
+const CURRENT_LAT = 23.8103;  // Dhaka/Ashulia
+const CURRENT_LON = 90.4125;
+const TARGET_LAT = -29.6823;  // South Africa
 const TARGET_LON = 17.9492; 
 
 // --- HELPERS ---
@@ -55,8 +56,8 @@ const TERMINAL_SCRIPT = [
   { text: "> SYSTEM BOOT...", delay: 500 },
   { text: "> CONNECTING TO SATELLITE...", delay: 800 },
   { text: "> TRIANGULATING SIGNAL...", delay: 1000 },
-  { text: "> DETECTED: KHULNA, BANGLADESH", delay: 1500, color: "#ffff00" },
-  { text: "Analysis: BORING AHH PLACE 😒", delay: 2000, color: "#ff3333" },
+  { text: "> DETECTED: DHAKA, BANGLADESH", delay: 1500, color: "#ffff00" },
+  { text: "Analysis: TOO FAR FROM TARGET 😒", delay: 2000, color: "#ff3333" },
   { text: "REROUTING TO: NORTHERN CAPE, SA", delay: 2000, color: "#00ff00", bold: true },
   { text: "> INITIATING WARP DRIVE ✈️...", delay: 2500 }
 ];
@@ -81,7 +82,7 @@ function Loader() {
   return (
     <Html center>
       <div className="text-green-500 font-mono text-center" style={{ minWidth: '300px' }}>
-        {/* FIX: Change ">" to "{'>'}" */}
+        {/* FIXED: Replaced raw > with {'>'} to fix Vercel Build */}
         <div className="text-xl mb-2">{'>'} DOWNLOADING ASSETS...</div>
         <div className="text-4xl font-bold">{progress.toFixed(0)}%</div>
       </div>
@@ -392,20 +393,30 @@ export default function App() {
     }
   }, [hasAnimationCompleted, isCandleLit]);
 
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => { if (event.code === "Space" || event.key === " ") { event.preventDefault(); blowCandle(); } };
-    window.addEventListener("keydown", handleKeyDown); return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [blowCandle]);
-
   const handleCardToggle = useCallback((id: string) => setActiveCardId((current) => (current === id ? null : id)), []);
 
   return (
     <div className="App">
       
+      {/* 1. HACKER TERMINAL (Intro) */}
       {appStage === 'terminal' && (
         <HackerTerminal onComplete={handleTerminalComplete} />
       )}
 
+      {/* 2. EARTH FLIGHT (Map) - Rendered outside Canvas */}
+      {appStage === 'flight' && (
+         <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', zIndex: 10 }}>
+            <EarthIntro 
+                startLat={CURRENT_LAT}
+                startLon={CURRENT_LON}
+                targetLat={TARGET_LAT} 
+                targetLon={TARGET_LON} 
+                onComplete={handleFlightComplete} 
+            />
+         </div>
+      )}
+
+      {/* 3. TYPING OVERLAY (Text before party) */}
       {isTypingStage && (
         <div 
             className="fullscreen-overlay" 
@@ -428,10 +439,7 @@ export default function App() {
         </div>
       )}
 
-      {appStage === 'party' && (
-         <div className="fullscreen-overlay" style={{ opacity: 0, pointerEvents: 'none' }} />
-      )}
-      
+      {/* 4. PARTY UI (Buttons) */}
       <div 
         className="ui-layer" 
         style={{ 
@@ -444,42 +452,44 @@ export default function App() {
           <button className="wish-button" onClick={blowCandle}>Tap to Blow Candle</button>
       </div>
       
-      <Canvas
-        gl={{ alpha: true }}
-        style={{ background: (appStage === 'terminal' || appStage === 'flight') ? '#050510' : 'transparent' }}
-        onCreated={({ gl }) => { gl.setClearColor("#000000", (appStage === 'terminal' || appStage === 'flight') ? 1 : 0); gl.shadowMap.enabled = true; gl.shadowMap.type = THREE.PCFSoftShadowMap; }}
-        shadows
-      >
-        <Suspense fallback={<Loader />}>
-          
-          {appStage === 'flight' && (
-            <EarthIntro 
-                startLat={CURRENT_LAT}
-                startLon={CURRENT_LON}
-                targetLat={TARGET_LAT} 
-                targetLon={TARGET_LON} 
-                onComplete={handleFlightComplete} 
+      {/* 5. MAIN 3D SCENE (Only rendered when NOT in flight/terminal) */}
+      {(appStage === 'typing' || appStage === 'party') && (
+        <Canvas
+          gl={{ alpha: true }}
+          style={{ background: 'transparent' }}
+          onCreated={({ gl }) => { 
+              gl.setClearColor("#000000", 0); 
+              gl.shadowMap.enabled = true; 
+              gl.shadowMap.type = THREE.PCFSoftShadowMap; 
+          }}
+          shadows
+        >
+          <Suspense fallback={<Loader />}>
+            <AnimatedScene 
+                isPlaying={appStage === 'party'} 
+                candleLit={isCandleLit} 
+                onBackgroundFadeChange={setBackgroundOpacity} 
+                onEnvironmentProgressChange={setEnvironmentProgress} 
+                onAnimationComplete={() => setHasAnimationCompleted(true)} 
+                cards={BIRTHDAY_CARDS} 
+                activeCardId={activeCardId} 
+                onToggleCard={handleCardToggle} 
+                fireworksActive={fireworksActive} 
             />
-          )}
-
-          {(appStage === 'typing' || appStage === 'party') && (
-            <>
-              <AnimatedScene isPlaying={appStage === 'party'} candleLit={isCandleLit} onBackgroundFadeChange={setBackgroundOpacity} onEnvironmentProgressChange={setEnvironmentProgress} onAnimationComplete={() => setHasAnimationCompleted(true)} cards={BIRTHDAY_CARDS} activeCardId={activeCardId} onToggleCard={handleCardToggle} fireworksActive={fireworksActive} />
-              <ambientLight intensity={(1 - environmentProgress) * 0.8} />
-              <directionalLight intensity={0.5 * (1 - environmentProgress)} position={[2, 10, 0]} color={[1, 0.9, 0.95]} castShadow />
-              <Environment files={["/background.exr"]} backgroundRotation={[0, 3.3, 0]} environmentRotation={[0, 3.3, 0]} background environmentIntensity={0.2 * environmentProgress} backgroundIntensity={0.1 * environmentProgress} />
-              <EnvironmentBackgroundController intensity={0.1 * environmentProgress} />
-              <CinematiceCameraControls sceneStarted={appStage === 'party'} />
-              
-              {/* POST PROCESSING FOR GLOW */}
-              <EffectComposer disableNormalPass>
-                <Bloom luminanceThreshold={1} mipmapBlur intensity={1.5} radius={0.4} />
-                <Vignette eskil={false} offset={0.1} darkness={1.1} />
-              </EffectComposer>
-            </>
-          )}
-        </Suspense>
-      </Canvas>
+            
+            <ambientLight intensity={(1 - environmentProgress) * 0.8} />
+            <directionalLight intensity={0.5 * (1 - environmentProgress)} position={[2, 10, 0]} color={[1, 0.9, 0.95]} castShadow />
+            <Environment files={["/background.exr"]} backgroundRotation={[0, 3.3, 0]} environmentRotation={[0, 3.3, 0]} background environmentIntensity={0.2 * environmentProgress} backgroundIntensity={0.1 * environmentProgress} />
+            <EnvironmentBackgroundController intensity={0.1 * environmentProgress} />
+            <CinematiceCameraControls sceneStarted={appStage === 'party'} />
+            
+            <EffectComposer disableNormalPass>
+              <Bloom luminanceThreshold={1} mipmapBlur intensity={1.5} radius={0.4} />
+              <Vignette eskil={false} offset={0.1} darkness={1.1} />
+            </EffectComposer>
+          </Suspense>
+        </Canvas>
+      )}
     </div>
   );
 }
