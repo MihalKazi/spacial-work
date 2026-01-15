@@ -37,6 +37,14 @@ const preloadAssets = () => {
   useTexture.preload("/card.png");
 };
 
+// --- HOLODECK DATA ---
+const PHOTO_MEMORIES: Record<string, string> = {
+  "/frame1.jpg": "Bro was the Forest Queen that day, Lost in Her Own World of Greens and Dreams.",
+  "/frame2.jpg": "An eye can show many things. It can show light in the darkest times.",
+  "/frame3.jpg": "Bro was the Local Mafia. Bro should have been Feared by All.",
+  "/frame4.jpg": "Bro Lost this Snap but it still remained. Cause a stalker saved it. 😂"
+};
+
 // --- UTILS ---
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 const lerp = (from: number, to: number, t: number) => from + (to - from) * t;
@@ -105,11 +113,11 @@ const BACKGROUND_FADE_START = Math.max((Math.max(CANDLE_DROP_START, BACKGROUND_F
 
 const TYPED_LINES = [
   "> ARRIVAL CONFIRMED.",
-  "> Location: Northern Cape, SA",
-  "> Hello, Abida.",
+  "> Location: Northern Cape, SOUTH AFRICA",
+  "> Hello, Abida Sultana Ety.",
   "> Current Date: 28 FEB 2026",
-  "> Status: SPECIAL DAY DETECTED",
-  "> Happy Birthday! 🎂",      
+  "> Status: THE ALGORITHM HAS FOUND THIS AS A SPACIAL DAY.",
+  "> Happy Birthday!",      
   "> Initiating Surprise Protocol..."
 ];
 
@@ -117,9 +125,9 @@ const TERMINAL_SCRIPT = [
   { text: "> SYSTEM BOOT...", delay: 500 },
   { text: "> CONNECTING TO SATELLITE...", delay: 800 },
   { text: "> TRIANGULATING SIGNAL...", delay: 1000 },
-  { text: "> DETECTED: DHAKA, BANGLADESH", delay: 1500, color: "#ffff00" },
-  { text: "Analysis: TOO FAR FROM TARGET 😒", delay: 2000, color: "#ff3333" },
-  { text: "REROUTING TO: NORTHERN CAPE, SA", delay: 2000, color: "#00ff00", bold: true },
+  { text: "> DETECTED: KHULNA, BANGLADESH", delay: 1500, color: "#ffff00" },
+  { text: "Analysis: THIS PLACE SHOULD BE CHANGED", delay: 2000, color: "#ff3333" },
+  { text: "REROUTING TO: NORTHERN CAPE, SOUTH AFRICA", delay: 2000, color: "#00ff00", bold: true },
   { text: "> INITIATING WARP DRIVE ✈️...", delay: 2500 }
 ];
 
@@ -171,7 +179,7 @@ function PrepOverlay({ progress, isVisible }: { progress: number, isVisible: boo
       transition: 'opacity 0.8s ease'
     }}>
       <div style={{ color: '#0f0', fontFamily: 'monospace', textAlign: 'center' }}>
-        <div style={{ fontSize: '1.2rem', marginBottom: '10px' }}>[ RENDERING SCENE ]</div>
+        <div style={{ fontSize: '1.2rem', marginBottom: '10px' }}>HOLDUP MAXNET++ <p>ON THE WORK</p></div>
         <div style={{ width: '200px', height: '4px', background: '#113311' }}>
           <div style={{ width: `${progress}%`, height: '100%', background: '#0f0', transition: 'width 0.3s' }} />
         </div>
@@ -273,10 +281,11 @@ function AnimatedScene({ isPlaying, onBackgroundFadeChange, onEnvironmentProgres
         <>
             <group ref={tableGroup}>
                 <Table />
-                <PictureFrame image="/frame2.jpg" position={[0, 0.735, 3]} rotation={[0, 5.6, 0]} scale={0.75} onClick={(e: any) => { e.stopPropagation(); onPhotoClick(new Vector3(0, 1, 3)); }} />
-                <PictureFrame image="/frame3.jpg" position={[0, 0.735, -3]} rotation={[0, 4.0, 0]} scale={0.75} onClick={(e: any) => { e.stopPropagation(); onPhotoClick(new Vector3(0, 1, -3)); }} />
-                <PictureFrame image="/frame4.jpg" position={[-1.5, 0.735, 2.5]} rotation={[0, 5.4, 0]} scale={0.75} onClick={(e: any) => { e.stopPropagation(); onPhotoClick(new Vector3(-1.5, 1, 2.5)); }} />
-                <PictureFrame image="/frame1.jpg" position={[-1.5, 0.735, -2.5]} rotation={[0, 4.2, 0]} scale={0.75} onClick={(e: any) => { e.stopPropagation(); onPhotoClick(new Vector3(-1.5, 1, -2.5)); }} />
+                {/* Updated onClick to pass the image path for memory lookup */}
+                <PictureFrame image="/frame2.jpg" position={[0, 0.735, 3]} rotation={[0, 5.6, 0]} scale={0.75} onClick={(e: any) => { e.stopPropagation(); onPhotoClick(new Vector3(0, 1, 3), "/frame2.jpg"); }} />
+                <PictureFrame image="/frame3.jpg" position={[0, 0.735, -3]} rotation={[0, 4.0, 0]} scale={0.75} onClick={(e: any) => { e.stopPropagation(); onPhotoClick(new Vector3(0, 1, -3), "/frame3.jpg"); }} />
+                <PictureFrame image="/frame4.jpg" position={[-1.5, 0.735, 2.5]} rotation={[0, 5.4, 0]} scale={0.75} onClick={(e: any) => { e.stopPropagation(); onPhotoClick(new Vector3(-1.5, 1, 2.5), "/frame4.jpg"); }} />
+                <PictureFrame image="/frame1.jpg" position={[-1.5, 0.735, -2.5]} rotation={[0, 4.2, 0]} scale={0.75} onClick={(e: any) => { e.stopPropagation(); onPhotoClick(new Vector3(-1.5, 1, -2.5), "/frame1.jpg"); }} />
                 {cards.map((card: any) => (
                     <BirthdayCard key={card.id} id={card.id} image={card.image} tablePosition={card.position} tableRotation={card.rotation} isActive={activeCardId === card.id} onToggle={() => onToggleCard(card.id)} />
                 ))}
@@ -315,17 +324,15 @@ function CinematiceCameraControls({ sceneStarted, focusTarget }: { sceneStarted:
       const ease = easeInOutCubic(progress);
       
       const finalPos = FINAL_CAM_POS_BASE.clone();
-      
-      // FIX: Increase the camera distance slightly more for portrait (mobile)
-      // to ensure the bottom of the table isn't cut off by Chrome's UI bars
       if (isPortrait) finalPos.add(new Vector3(2.5, 4.5, 11)); 
       
       camera.position.lerpVectors(START_CAM_POS, finalPos, ease);
       camera.lookAt(new Vector3().lerpVectors(START_CAM_TARGET, ORBIT_TARGET, ease));
       if (progress >= 1) setIsSweeping(false);
     } else if (focusTarget && controlsRef.current) {
+      // Zoom logic: fly closer to the specific frame
       const direction = new Vector3().subVectors(camera.position, focusTarget).normalize();
-      const zoomPos = focusTarget.clone().add(direction.multiplyScalar(4)); 
+      const zoomPos = focusTarget.clone().add(direction.multiplyScalar(2.0)); 
       camera.position.lerp(zoomPos, 0.07);
       controlsRef.current.target.lerp(focusTarget, 0.07);
       controlsRef.current.update();
@@ -342,6 +349,8 @@ export default function App() {
   const [appStage, setAppStage] = useState<'intro' | 'terminal' | 'flight' | 'typing' | 'preparing' | 'party'>('intro');
   const [typingFadingOut, setTypingFadingOut] = useState(false); 
   const [focusTarget, setFocusTarget] = useState<Vector3 | null>(null);
+  const [activeMemory, setActiveMemory] = useState<string | null>(null);
+  const [typedMemory, setTypedMemory] = useState("");
   
   const [environmentProgress, setEnvironmentProgress] = useState(0);
   const [currentLineIndex, setCurrentLineIndex] = useState(0);
@@ -355,12 +364,11 @@ export default function App() {
   const ambientAudioRef = useRef<HTMLAudioElement | null>(null);
   const { progress } = useProgress();
   
-  // FIX: Force reset body margins to prevent clipping
   useEffect(() => {
     document.body.style.margin = '0';
     document.body.style.padding = '0';
     document.body.style.overflow = 'hidden';
-    document.body.style.touchAction = 'none'; // Prevents pull-to-refresh
+    document.body.style.touchAction = 'none';
   }, []);
 
   useEffect(() => {
@@ -375,6 +383,22 @@ export default function App() {
         backgroundAudioRef.current.volume = 0.8;
     }
   }, []);
+
+  // --- TYPING EFFECT FOR HOLODECK ---
+  useEffect(() => {
+    if (activeMemory) {
+      setTypedMemory("");
+      let i = 0;
+      const interval = setInterval(() => {
+        setTypedMemory(activeMemory.slice(0, i));
+        i++;
+        if (i > activeMemory.length) clearInterval(interval);
+      }, 30);
+      return () => clearInterval(interval);
+    } else {
+      setTypedMemory("");
+    }
+  }, [activeMemory]);
 
   const handleStart = () => {
     setAppStage('terminal');
@@ -418,44 +442,47 @@ export default function App() {
       setIsCandleLit(false);
       ambientAudioRef.current?.pause();
       const bgMusic = backgroundAudioRef.current;
-      if (bgMusic) {
-        bgMusic.play().then(() => {
-            console.log("Birthday music started successfully");
-        }).catch(err => {
-            console.warn("Mobile autoplay block", err);
-        });
-      }
-      setTimeout(() => {
-        setFireworksActive(true);
-      }, 800);
+      if (bgMusic) { bgMusic.play().catch(err => console.warn(err)); }
+      setTimeout(() => setFireworksActive(true), 800);
     }
   }, [hasAnimationCompleted, isCandleLit]);
 
   useMicrophone(blowCandle, appStage === 'party' && isCandleLit && hasAnimationCompleted);
 
+  const handlePhotoSelect = (pos: Vector3, img: string) => {
+    setFocusTarget(pos);
+    setActiveMemory(PHOTO_MEMORIES[img] || "Memory retrieval failed. Unknown beautiful moment.");
+  };
+
   return (
     <div className="App" style={{ 
-        position: 'fixed', 
-        inset: '0',  // FIX: Anchors to all 4 corners 
-        width: '100%', 
-        height: '100%', 
-        overflow: 'hidden', 
-        background: '#000',
-        touchAction: 'none' // FIX: Disables scrolling on Chrome mobile
+        position: 'fixed', inset: '0', width: '100%', height: '100%', 
+        overflow: 'hidden', background: '#000', touchAction: 'none' 
     }}>
       
       {appStage === 'intro' && (
         <div className="fullscreen-overlay" style={{ zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <div className="terminal-box" style={{ textAlign: 'center', border: '1px solid #0f0' }}>
-                <div style={{ color: '#0f0', marginBottom: '20px', fontFamily: 'monospace' }}>SECURE CONNECTION ESTABLISHED.</div>
-                <button 
-                    onClick={handleStart}
-                    className="wish-button"
-                    style={{ background: 'transparent', border: '1px solid #0f0', color: '#0f0', cursor: 'pointer' }}
-                >
+                <div style={{ color: '#0f0', marginBottom: '20px', fontFamily: 'monospace' }}></div>
+                <button onClick={handleStart} className="wish-button" style={{ background: 'transparent', border: '1px solid #0f0', color: '#0f0', cursor: 'pointer' }}>
                     RUN SurprizeProtocol.exe
                 </button>
             </div>
+        </div>
+      )}
+
+      {/* --- MEMORY HOLODECK UI OVERLAY --- */}
+      {activeMemory && (
+        <div className="memory-overlay" style={{
+          position: 'fixed', bottom: '20%', left: '50%', transform: 'translateX(-50%)',
+          zIndex: 100, color: '#0f0', fontFamily: 'monospace', textAlign: 'center',
+          background: 'rgba(0,10,0,0.85)', padding: '20px', borderRadius: '4px',
+          border: '1px solid #0f0', width: '85%', maxWidth: '450px', pointerEvents: 'none',
+          boxShadow: '0 0 20px rgba(0,255,0,0.2)'
+        }}>
+          <div style={{ fontSize: '0.65rem', opacity: 0.6, marginBottom: '8px', letterSpacing: '2px' }}>[ DATA RETRIEVAL SUCCESSFUL ]</div>
+          <div style={{ fontSize: '1rem', lineHeight: '1.4' }}>{typedMemory}<span className="cursor"></span></div>
+          <div style={{ fontSize: '0.6rem', marginTop: '12px', color: '#666' }}>TAP BACKGROUND TO RETURN</div>
         </div>
       )}
 
@@ -481,7 +508,6 @@ export default function App() {
         opacity: hasAnimationCompleted && isCandleLit && appStage === 'party' ? 1 : 0, 
         pointerEvents: isCandleLit ? 'auto' : 'none',
         zIndex: 60, transition: 'opacity 1s ease',
-        // FIX: Ensure UI is not hidden behind iPhone home bar
         paddingBottom: 'env(safe-area-inset-bottom)'
       }}>
           <div style={{ color: 'white', marginBottom: '10px', textShadow: '0 0 10px #00ff00', textAlign: 'center' }}>
@@ -493,17 +519,10 @@ export default function App() {
       
       {(appStage === 'preparing' || appStage === 'party') && (
         <Canvas 
-          shadows 
-          dpr={[1, 1.5]}
-          gl={{ 
-            antialias: false, 
-            powerPreference: "high-performance",
-            alpha: false,
-            stencil: false,
-            depth: true
-          }}
+          shadows dpr={[1, 1.5]}
+          gl={{ antialias: false, powerPreference: "high-performance", alpha: false, stencil: false, depth: true }}
           style={{ opacity: appStage === 'party' ? 1 : 0, transition: 'opacity 2s ease' }}
-          onPointerMissed={() => { setFocusTarget(null); setActiveCardId(null); }}
+          onPointerMissed={() => { setFocusTarget(null); setActiveCardId(null); setActiveMemory(null); }}
         >
           <Suspense fallback={null}>
             <AnimatedScene 
@@ -516,7 +535,7 @@ export default function App() {
                 activeCardId={activeCardId}
                 onToggleCard={(id: string) => setActiveCardId(prev => (prev === id ? null : id))}
                 fireworksActive={fireworksActive} 
-                onPhotoClick={setFocusTarget}
+                onPhotoClick={handlePhotoSelect}
             />
             <FireworkFlash active={fireworksActive} envProgress={environmentProgress} />
             <Environment files={["/background.hdr"]} background environmentIntensity={0.2 * environmentProgress} backgroundIntensity={0.1 * environmentProgress} />
