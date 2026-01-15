@@ -1,6 +1,6 @@
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { Environment, OrbitControls, Html, useProgress, useGLTF, useTexture } from "@react-three/drei";
-import { EffectComposer, Bloom, Vignette } from "@react-three/postprocessing"; 
+import { EffectComposer, Bloom } from "@react-three/postprocessing"; 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Group } from "three";
 import { Vector3 } from "three";
@@ -35,18 +35,62 @@ useTexture.preload("/frame3.jpg");
 useTexture.preload("/frame4.jpg");
 useTexture.preload("/card.png");
 
-// --- CONFIG ---
-const CURRENT_LAT = 23.8103;
-const CURRENT_LON = 90.4125;
-const TARGET_LAT = -29.6823;
-const TARGET_LON = 17.9492; 
-
+// --- UTILS ---
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 const lerp = (from: number, to: number, t: number) => from + (to - from) * t;
 const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
 const easeInOutCubic = (t: number) => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 
-// --- ANIMATION CONSTANTS ---
+// --- MICROPHONE HOOK ---
+function useMicrophone(onBlow: () => void, active: boolean) {
+  useEffect(() => {
+    if (!active) return;
+    let audioContext: AudioContext;
+    let analyser: AnalyserNode;
+    let microphone: MediaStreamAudioSourceNode;
+    let animationFrame: number;
+
+    const initMic = async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+        analyser = audioContext.createAnalyser();
+        microphone = audioContext.createMediaStreamSource(stream);
+        microphone.connect(analyser);
+        analyser.fftSize = 256;
+        const bufferLength = analyser.frequencyBinCount;
+        const dataArray = new Uint8Array(bufferLength);
+
+        const checkVolume = () => {
+          analyser.getByteFrequencyData(dataArray);
+          let values = 0;
+          for (let i = 0; i < bufferLength; i++) values += dataArray[i];
+          const average = values / bufferLength;
+          if (average > 55) { // Sensitivity threshold
+            onBlow();
+          } else {
+            animationFrame = requestAnimationFrame(checkVolume);
+          }
+        };
+        checkVolume();
+      } catch (err) {
+        console.warn("Mic access denied:", err);
+      }
+    };
+    initMic();
+    return () => {
+      if (animationFrame) cancelAnimationFrame(animationFrame);
+      if (audioContext) audioContext.close();
+    };
+  }, [active, onBlow]);
+}
+
+// --- CONFIG & CONSTANTS ---
+const CURRENT_LAT = 23.8103;
+const CURRENT_LON = 90.4125;
+const TARGET_LAT = -29.6823;
+const TARGET_LON = 17.9492; 
+
 const CAKE_START_Y = 10;
 const CAKE_END_Y = 0;
 const CAKE_DESCENT_DURATION = 3;
@@ -62,17 +106,6 @@ const totalAnimationTime = CANDLE_DROP_START + CANDLE_DROP_DURATION;
 const BACKGROUND_FADE_DURATION = 1.5; 
 const BACKGROUND_FADE_START = Math.max((Math.max(CANDLE_DROP_START, BACKGROUND_FADE_DURATION) - BACKGROUND_FADE_DURATION), 0);
 
-// --- SCRIPTS ---
-const TERMINAL_SCRIPT = [
-  { text: "> SYSTEM BOOT...", delay: 500 },
-  { text: "> CONNECTING TO SATELLITE...", delay: 800 },
-  { text: "> TRIANGULATING SIGNAL...", delay: 1000 },
-  { text: "> DETECTED: DHAKA, BANGLADESH", delay: 1500, color: "#ffff00" },
-  { text: "Analysis: TOO FAR FROM TARGET 😒", delay: 2000, color: "#ff3333" },
-  { text: "REROUTING TO: NORTHERN CAPE, SA", delay: 2000, color: "#00ff00", bold: true },
-  { text: "> INITIATING WARP DRIVE ✈️...", delay: 2500 }
-];
-
 const TYPED_LINES = [
   "> ARRIVAL CONFIRMED.",
   "> Location: Northern Cape, SA",
@@ -83,11 +116,19 @@ const TYPED_LINES = [
   "> Initiating Surprise Protocol..."
 ];
 
+const TERMINAL_SCRIPT = [
+  { text: "> SYSTEM BOOT...", delay: 500 },
+  { text: "> CONNECTING TO SATELLITE...", delay: 800 },
+  { text: "> TRIANGULATING SIGNAL...", delay: 1000 },
+  { text: "> DETECTED: DHAKA, BANGLADESH", delay: 1500, color: "#ffff00" },
+  { text: "Analysis: TOO FAR FROM TARGET 😒", delay: 2000, color: "#ff3333" },
+  { text: "REROUTING TO: NORTHERN CAPE, SA", delay: 2000, color: "#00ff00", bold: true },
+  { text: "> INITIATING WARP DRIVE ✈️...", delay: 2500 }
+];
+
 const TYPED_CHAR_DELAY = 40;        
 const POST_TYPING_SCENE_DELAY = 3000; 
-const CURSOR_BLINK_INTERVAL = 500;
 
-// --- LOADER ---
 function Loader() {
   const { progress } = useProgress();
   return (
@@ -100,7 +141,6 @@ function Loader() {
   );
 }
 
-// --- HACKER TERMINAL ---
 function HackerTerminal({ onComplete }: { onComplete: () => void }) {
   const [lineIndex, setLineIndex] = useState(0);
   const [isExiting, setIsExiting] = useState(false);
@@ -136,21 +176,21 @@ function HackerTerminal({ onComplete }: { onComplete: () => void }) {
   );
 }
 
-// --- ANIMATED SCENE COMPONENTS ---
-type BirthdayCardConfig = { id: string; image: string; position: [number, number, number]; rotation: [number, number, number]; };
-const BIRTHDAY_CARDS: ReadonlyArray<BirthdayCardConfig> = [
-  { id: "confetti", image: "/card.png", position: [1, 0.081, -2], rotation: [-Math.PI / 2, 0, Math.PI / 3] }
-];
-const ORBIT_TARGET = new Vector3(0, 1, 0);
-const FINAL_CAM_POS_BASE = new Vector3(3, 1, 0).add(ORBIT_TARGET); 
-const START_CAM_TARGET = new Vector3(-40, 12, 0); 
-const START_CAM_POS = new Vector3(-10, 15, 30);   
-const CAMERA_SWOOP_DURATION = 6.0;
+function FireworkFlash({ active, envProgress }: { active: boolean, envProgress: number }) {
+  const lightRef = useRef<THREE.PointLight>(null);
+  useFrame(({ clock }) => {
+    if (active && lightRef.current) {
+      lightRef.current.intensity = (Math.sin(clock.elapsedTime * 15) > 0 ? 3 : 0.2) * envProgress;
+    }
+  });
+  return active ? <pointLight ref={lightRef} position={[0, 8, 0]} color="#FFD700" distance={20} /> : null;
+}
 
-function AnimatedScene({ isPlaying, onBackgroundFadeChange, onEnvironmentProgressChange, candleLit, onAnimationComplete, cards, activeCardId, onToggleCard, fireworksActive }: any) {
+function AnimatedScene({ isPlaying, onBackgroundFadeChange, onEnvironmentProgressChange, candleLit, onAnimationComplete, cards, activeCardId, onToggleCard, fireworksActive, onPhotoClick }: any) {
     const cakeGroup = useRef<Group>(null);
     const tableGroup = useRef<Group>(null);
     const candleGroup = useRef<Group>(null);
+    const smokeRef = useRef<THREE.Points>(null);
     const animationStartRef = useRef<number | null>(null);
     const hasPrimedRef = useRef(false);
     const hasCompletedRef = useRef(false);
@@ -181,139 +221,103 @@ function AnimatedScene({ isPlaying, onBackgroundFadeChange, onEnvironmentProgres
     useFrame(({ clock }) => {
         const cake = cakeGroup.current; const table = tableGroup.current; const candle = candleGroup.current;
         if (!cake || !table || !candle) return;
-
         if (!hasPrimedRef.current) {
             cake.position.set(0, CAKE_START_Y, 0); table.position.set(0, 0, TABLE_START_Z); candle.position.set(0, CANDLE_START_Y, 0);
             candle.visible = false; hasPrimedRef.current = true;
         }
-
         if (!isPlaying) {
             emitBackgroundOpacity(1); emitEnvironmentProgress(0); animationStartRef.current = null;
-            hasCompletedRef.current = false; completionNotifiedRef.current = false; return;
+            hasCompletedRef.current = false; return;
         }
-
         if (hasCompletedRef.current) {
             emitBackgroundOpacity(0); emitEnvironmentProgress(1);
             if (!completionNotifiedRef.current) { completionNotifiedRef.current = true; onAnimationComplete?.(); }
+            if (smokeRef.current && !candleLit) {
+                smokeRef.current.position.y += 0.005;
+                (smokeRef.current.material as THREE.PointsMaterial).opacity *= 0.97;
+            }
             return;
         }
-
         if (animationStartRef.current === null) animationStartRef.current = clock.elapsedTime;
         const elapsed = clock.elapsedTime - animationStartRef.current;
         const clampedElapsed = clamp(elapsed, 0, totalAnimationTime);
-
-        const cakeProgress = clamp(clampedElapsed / CAKE_DESCENT_DURATION, 0, 1);
-        const cakeEase = easeOutCubic(cakeProgress);
-        cake.position.y = lerp(CAKE_START_Y, CAKE_END_Y, cakeEase);
-        cake.rotation.y = cakeEase * Math.PI * 2;
-
-        let tableZ = TABLE_START_Z;
-        if (clampedElapsed >= TABLE_SLIDE_START) {
-            const tableProgress = clamp((clampedElapsed - TABLE_SLIDE_START) / TABLE_SLIDE_DURATION, 0, 1);
-            tableZ = lerp(TABLE_START_Z, TABLE_END_Z, easeOutCubic(tableProgress));
-        }
-        table.position.z = tableZ;
-
+        cake.position.y = lerp(CAKE_START_Y, CAKE_END_Y, easeOutCubic(clamp(clampedElapsed / CAKE_DESCENT_DURATION, 0, 1)));
+        cake.rotation.y = easeOutCubic(clamp(clampedElapsed / CAKE_DESCENT_DURATION, 0, 1)) * Math.PI * 2;
+        if (clampedElapsed >= TABLE_SLIDE_START) table.position.z = lerp(TABLE_START_Z, TABLE_END_Z, easeOutCubic(clamp((clampedElapsed - TABLE_SLIDE_START) / TABLE_SLIDE_DURATION, 0, 1)));
         if (clampedElapsed >= CANDLE_DROP_START) {
             if (!candle.visible) candle.visible = true;
-            const candleProgress = clamp((clampedElapsed - CANDLE_DROP_START) / CANDLE_DROP_DURATION, 0, 1);
-            candle.position.y = lerp(CANDLE_START_Y, CANDLE_END_Y, easeOutCubic(candleProgress));
-        } else {
-            candle.visible = false; candle.position.y = CANDLE_START_Y;
+            candle.position.y = lerp(CANDLE_START_Y, CANDLE_END_Y, easeOutCubic(clamp((clampedElapsed - CANDLE_DROP_START) / CANDLE_DROP_DURATION, 0, 1)));
         }
-
-        if (clampedElapsed < BACKGROUND_FADE_START) { 
-            emitBackgroundOpacity(1); 
-            emitEnvironmentProgress(0); 
-        } else {
+        if (clampedElapsed < BACKGROUND_FADE_START) { emitBackgroundOpacity(1); emitEnvironmentProgress(0); }
+        else {
             const fadeProgress = clamp((clampedElapsed - BACKGROUND_FADE_START) / BACKGROUND_FADE_DURATION, 0, 1);
             const bgOpacity = 1 - easeOutCubic(fadeProgress);
-            emitBackgroundOpacity(bgOpacity); 
-            emitEnvironmentProgress(1 - bgOpacity);
+            emitBackgroundOpacity(bgOpacity); emitEnvironmentProgress(1 - bgOpacity);
         }
-
-        if (clampedElapsed >= totalAnimationTime) {
-            cake.position.set(0, CAKE_END_Y, 0); table.position.set(0, 0, TABLE_END_Z); candle.position.set(0, CANDLE_END_Y, 0); candle.visible = true;
-            hasCompletedRef.current = true;
-        }
+        if (clampedElapsed >= totalAnimationTime) hasCompletedRef.current = true;
     });
 
     return (
         <>
             <group ref={tableGroup}>
                 <Table />
-                <PictureFrame image="/frame2.jpg" position={[0, 0.735, 3]} rotation={[0, 5.6, 0]} scale={0.75} />
-                <PictureFrame image="/frame3.jpg" position={[0, 0.735, -3]} rotation={[0, 4.0, 0]} scale={0.75} />
-                <PictureFrame image="/frame4.jpg" position={[-1.5, 0.735, 2.5]} rotation={[0, 5.4, 0]} scale={0.75} />
-                <PictureFrame image="/frame1.jpg" position={[-1.5, 0.735, -2.5]} rotation={[0, 4.2, 0]} scale={0.75} />
+                <PictureFrame image="/frame2.jpg" position={[0, 0.735, 3]} rotation={[0, 5.6, 0]} scale={0.75} onClick={(e: any) => { e.stopPropagation(); onPhotoClick(new Vector3(0, 1, 3)); }} />
+                <PictureFrame image="/frame3.jpg" position={[0, 0.735, -3]} rotation={[0, 4.0, 0]} scale={0.75} onClick={(e: any) => { e.stopPropagation(); onPhotoClick(new Vector3(0, 1, -3)); }} />
+                <PictureFrame image="/frame4.jpg" position={[-1.5, 0.735, 2.5]} rotation={[0, 5.4, 0]} scale={0.75} onClick={(e: any) => { e.stopPropagation(); onPhotoClick(new Vector3(-1.5, 1, 2.5)); }} />
+                <PictureFrame image="/frame1.jpg" position={[-1.5, 0.735, -2.5]} rotation={[0, 4.2, 0]} scale={0.75} onClick={(e: any) => { e.stopPropagation(); onPhotoClick(new Vector3(-1.5, 1, -2.5)); }} />
                 {cards.map((card: any) => (
-                    <BirthdayCard key={card.id} id={card.id} image={card.image} tablePosition={card.position} tableRotation={card.rotation} isActive={activeCardId === card.id} onToggle={onToggleCard} />
+                    <BirthdayCard key={card.id} id={card.id} image={card.image} tablePosition={card.position} tableRotation={card.rotation} isActive={activeCardId === card.id} onToggle={() => onToggleCard(card.id)} />
                 ))}
             </group>
             <group ref={cakeGroup}><Cake /></group>
             <group ref={candleGroup}><Candle isLit={candleLit} scale={0.5} position={[0.5, 0.5, 0.5]} rotation={[0.2, 0, -0.2]} /></group>
-            <Fireworks isActive={fireworksActive} origin={[0, 10, 0]} />
-            <Glitter isActive={fireworksActive} />
-            <Moon isActive={fireworksActive} />
-            <Aurora isActive={fireworksActive} />
-            <GoldenText isActive={fireworksActive} />
+            {!candleLit && !fireworksActive && (
+                <points ref={smokeRef} position={[0, 0.8, 0]}><sphereGeometry args={[0.05, 6, 6]} /><pointsMaterial color="#ffffff" transparent opacity={0.4} size={0.03} /></points>
+            )}
+            <Fireworks isActive={fireworksActive} origin={[0, 10, 0]} /><Glitter isActive={fireworksActive} /><Moon isActive={fireworksActive} /><Aurora isActive={fireworksActive} /><GoldenText isActive={fireworksActive} />
         </>
     );
 }
 
-// --- UPDATED RESPONSIVE CAMERA ---
-function CinematiceCameraControls({ sceneStarted }: { sceneStarted: boolean }) {
+const ORBIT_TARGET = new Vector3(0, 1, 0);
+const FINAL_CAM_POS_BASE = new Vector3(3, 1, 0).add(ORBIT_TARGET); 
+const START_CAM_TARGET = new Vector3(-40, 12, 0); 
+const START_CAM_POS = new Vector3(-10, 15, 30);   
+const CAMERA_SWOOP_DURATION = 6.0;
+
+function CinematiceCameraControls({ sceneStarted, focusTarget }: { sceneStarted: boolean, focusTarget: Vector3 | null }) {
   const controlsRef = useRef<OrbitControlsImpl>(null);
   const { camera, size } = useThree();
   const [isSweeping, setIsSweeping] = useState(false);
   const sweepStartTime = useRef<number | null>(null);
-  const hasSweptOnce = useRef(false);
-
   const isPortrait = size.height > size.width;
 
-  const finalPos = useMemo(() => {
-    const pos = FINAL_CAM_POS_BASE.clone();
-    if (isPortrait) {
-      // Offset position specifically for portrait aspect ratios
-      pos.add(new Vector3(2, 4, 10)); 
-    }
-    return pos;
-  }, [isPortrait]);
-
   useEffect(() => {
-    if (sceneStarted && !hasSweptOnce.current) {
-      setIsSweeping(true);
-      hasSweptOnce.current = true;
-      camera.position.copy(START_CAM_POS);
-      
-      if ("fov" in camera) {
-        // Increase FOV in portrait to ensure elements aren't cut off
-        (camera as any).fov = isPortrait ? 75 : 45;
-        (camera as any).updateProjectionMatrix();
-      }
-    }
-  }, [sceneStarted, camera, isPortrait]);
+    if (sceneStarted) { setIsSweeping(true); camera.position.copy(START_CAM_POS); }
+  }, [sceneStarted, camera]);
 
   useFrame(({ clock }) => {
-    if (!isSweeping) return;
-    if (sweepStartTime.current === null) sweepStartTime.current = clock.elapsedTime;
-    const progress = Math.min((clock.elapsedTime - sweepStartTime.current) / CAMERA_SWOOP_DURATION, 1);
-    const ease = easeInOutCubic(progress);
-    
-    camera.position.lerpVectors(START_CAM_POS, finalPos, ease);
-    camera.lookAt(new Vector3().lerpVectors(START_CAM_TARGET, ORBIT_TARGET, ease));
-
-    if (progress >= 1) {
-      setIsSweeping(false);
-      if (controlsRef.current) {
-        controlsRef.current.enabled = true;
-        controlsRef.current.target.copy(ORBIT_TARGET);
-        controlsRef.current.update();
-      }
+    if (isSweeping) {
+      if (sweepStartTime.current === null) sweepStartTime.current = clock.elapsedTime;
+      const progress = Math.min((clock.elapsedTime - sweepStartTime.current) / CAMERA_SWOOP_DURATION, 1);
+      const ease = easeInOutCubic(progress);
+      const finalPos = FINAL_CAM_POS_BASE.clone();
+      if (isPortrait) finalPos.add(new Vector3(2, 4, 10));
+      camera.position.lerpVectors(START_CAM_POS, finalPos, ease);
+      camera.lookAt(new Vector3().lerpVectors(START_CAM_TARGET, ORBIT_TARGET, ease));
+      if (progress >= 1) setIsSweeping(false);
+    } else if (focusTarget && controlsRef.current) {
+      const direction = new Vector3().subVectors(camera.position, focusTarget).normalize();
+      const zoomPos = focusTarget.clone().add(direction.multiplyScalar(4)); 
+      camera.position.lerp(zoomPos, 0.07);
+      controlsRef.current.target.lerp(focusTarget, 0.07);
+      controlsRef.current.update();
+    } else if (controlsRef.current) {
+      controlsRef.current.target.lerp(ORBIT_TARGET, 0.05);
+      controlsRef.current.update();
     }
   });
-
-  return <OrbitControls ref={controlsRef} enableDamping dampingFactor={0.05} minDistance={5} maxDistance={25} maxPolarAngle={Math.PI / 2} />;
+  return <OrbitControls ref={controlsRef} enableDamping dampingFactor={0.05} minDistance={2} maxDistance={30} />;
 }
 
 function EnvironmentBackgroundController({ intensity }: { intensity: number }) {
@@ -322,157 +326,101 @@ function EnvironmentBackgroundController({ intensity }: { intensity: number }) {
   return null;
 }
 
-// --- MAIN APP ---
 export default function App() {
   const [appStage, setAppStage] = useState<'terminal' | 'flight' | 'typing' | 'party'>('terminal');
   const [typingFadingOut, setTypingFadingOut] = useState(false); 
-  const [showOrientationHint, setShowOrientationHint] = useState(false);
-
+  const [focusTarget, setFocusTarget] = useState<Vector3 | null>(null);
   const [backgroundOpacity, setBackgroundOpacity] = useState(1);
   const [environmentProgress, setEnvironmentProgress] = useState(0);
   const [currentLineIndex, setCurrentLineIndex] = useState(0);
   const [currentCharIndex, setCurrentCharIndex] = useState(0);
-  const [cursorVisible, setCursorVisible] = useState(true);
   const [hasAnimationCompleted, setHasAnimationCompleted] = useState(false);
   const [isCandleLit, setIsCandleLit] = useState(true);
   const [fireworksActive, setFireworksActive] = useState(false);
   const [activeCardId, setActiveCardId] = useState<string | null>(null);
   const backgroundAudioRef = useRef<HTMLAudioElement | null>(null);
+  const ambientAudioRef = useRef<HTMLAudioElement | null>(null);
   
-  const { progress } = useProgress();
-
   useEffect(() => {
-    const checkOrientation = () => setShowOrientationHint(window.innerHeight > window.innerWidth);
-    checkOrientation();
-    window.addEventListener('resize', checkOrientation);
-    return () => window.removeEventListener('resize', checkOrientation);
+    ambientAudioRef.current = new Audio("/ambient_night.mp3");
+    backgroundAudioRef.current = new Audio("/music.mp3");
+    if (ambientAudioRef.current) { ambientAudioRef.current.loop = true; ambientAudioRef.current.volume = 0.5; }
+    if (backgroundAudioRef.current) { backgroundAudioRef.current.loop = true; }
   }, []);
 
-  const handleTerminalComplete = useCallback(() => setAppStage('flight'), []);
-  
-  const handleFlightComplete = useCallback(() => {
-    if (progress >= 100) setAppStage('typing');
-    else {
-      const check = setInterval(() => {
-        if (progress >= 100) { setAppStage('typing'); clearInterval(check); }
-      }, 100);
-    }
-  }, [progress]);
+  useEffect(() => { if (appStage === 'party') ambientAudioRef.current?.play().catch(() => {}); }, [appStage]);
 
-  useEffect(() => {
-    const audio = new Audio("/music.mp3");
-    audio.loop = true; audio.preload = "auto"; 
-    backgroundAudioRef.current = audio;
-    return () => { audio.pause(); backgroundAudioRef.current = null; };
-  }, []);
-
-  const isTypingStage = appStage === 'typing';
-  const typingComplete = currentLineIndex >= TYPED_LINES.length;
-
-  const typedLines = useMemo(() => {
-    if (!isTypingStage) return [];
-    return TYPED_LINES.map((line, index) => {
-      if (typingComplete || index < currentLineIndex) return line;
-      if (index === currentLineIndex) return line.slice(0, Math.min(currentCharIndex, line.length));
-      return "";
-    });
-  }, [currentCharIndex, currentLineIndex, typingComplete, isTypingStage]);
-
-  const cursorLineIndex = typingComplete ? Math.max(typedLines.length - 1, 0) : currentLineIndex;
-  const cursorTargetIndex = Math.max(Math.min(cursorLineIndex, typedLines.length - 1), 0);
-
-  useEffect(() => {
-    if (!isTypingStage) return;
-    if (typingComplete) {
-      const suspendHandle = window.setTimeout(() => {
-          setTypingFadingOut(true);
-          setTimeout(() => { setAppStage('party'); setTypingFadingOut(false); }, 1000);
-      }, POST_TYPING_SCENE_DELAY);
-      return () => window.clearTimeout(suspendHandle);
-    }
-    const currentLine = TYPED_LINES[currentLineIndex] ?? "";
-    const handle = window.setTimeout(() => {
-      if (currentCharIndex < currentLine.length) setCurrentCharIndex((prev) => prev + 1); 
-      else { setCurrentLineIndex((prev) => prev + 1); setCurrentCharIndex(0); }
-    }, TYPED_CHAR_DELAY);
-    return () => window.clearTimeout(handle);
-  }, [currentCharIndex, currentLineIndex, typingComplete, isTypingStage]);
-
-  useEffect(() => {
-    const handle = window.setInterval(() => setCursorVisible((prev) => !prev), CURSOR_BLINK_INTERVAL);
-    return () => window.clearInterval(handle);
-  }, []);
+  const handleToggleCard = useCallback((id: string) => {
+    setActiveCardId(prev => (prev === id ? null : id));
+    if (activeCardId !== id) setFocusTarget(null);
+  }, [activeCardId]);
 
   const blowCandle = useCallback(() => {
     if (hasAnimationCompleted && isCandleLit) {
-      setIsCandleLit(false); setFireworksActive(true);
-      if (backgroundAudioRef.current) backgroundAudioRef.current.play().catch((err) => console.warn("Audio blocked:", err));
+      setIsCandleLit(false);
+      setTimeout(() => {
+        setFireworksActive(true);
+        ambientAudioRef.current?.pause();
+        backgroundAudioRef.current?.play().catch(() => {});
+      }, 800);
     }
   }, [hasAnimationCompleted, isCandleLit]);
 
-  const handleCardToggle = useCallback((id: string) => setActiveCardId((current) => (current === id ? null : id)), []);
+  // ACTIVATE MICROPHONE BLOWING
+  useMicrophone(blowCandle, appStage === 'party' && isCandleLit && hasAnimationCompleted);
+
+  const typingComplete = currentLineIndex >= TYPED_LINES.length;
+  const typedLines = useMemo(() => {
+    if (appStage !== 'typing') return [];
+    return TYPED_LINES.map((line, index) => {
+      if (typingComplete || index < currentLineIndex) return line;
+      if (index === currentLineIndex) return line.slice(0, currentCharIndex);
+      return "";
+    });
+  }, [currentCharIndex, currentLineIndex, typingComplete, appStage]);
+
+  useEffect(() => {
+    if (appStage !== 'typing') return;
+    if (typingComplete) {
+      setTimeout(() => {
+        setTypingFadingOut(true);
+        setTimeout(() => setAppStage('party'), 1000);
+      }, POST_TYPING_SCENE_DELAY);
+      return;
+    }
+    const timeout = setTimeout(() => {
+      if (currentCharIndex < (TYPED_LINES[currentLineIndex]?.length || 0)) setCurrentCharIndex(prev => prev + 1);
+      else { setCurrentLineIndex(prev => prev + 1); setCurrentCharIndex(0); }
+    }, TYPED_CHAR_DELAY);
+    return () => clearTimeout(timeout);
+  }, [currentCharIndex, currentLineIndex, typingComplete, appStage]);
 
   return (
     <div className="App" style={{ height: '100dvh', width: '100vw', overflow: 'hidden', position: 'fixed' }}>
-      {showOrientationHint && appStage === 'party' && (
-        <div className="soft-hint" onClick={() => setShowOrientationHint(false)}>
-          <span>🔄 Rotate for a wider view</span>
-        </div>
-      )}
-
-      {appStage === 'terminal' && <HackerTerminal onComplete={handleTerminalComplete} />}
-
-      {appStage === 'flight' && (
-         <div style={{ position: 'absolute', inset: 0, zIndex: 10 }}>
-            <EarthIntro startLat={CURRENT_LAT} startLon={CURRENT_LON} targetLat={TARGET_LAT} targetLon={TARGET_LON} onComplete={handleFlightComplete} />
-         </div>
-      )}
-
-      {isTypingStage && (
-        <div className="fullscreen-overlay" style={{ opacity: typingFadingOut ? 0 : backgroundOpacity, transition: 'opacity 1s ease-in-out' }}>
+      {appStage === 'terminal' && <HackerTerminal onComplete={() => setAppStage('flight')} />}
+      {appStage === 'flight' && <EarthIntro startLat={CURRENT_LAT} startLon={CURRENT_LON} targetLat={TARGET_LAT} targetLon={TARGET_LON} onComplete={() => setAppStage('typing')} />}
+      {appStage === 'typing' && (
+        <div className="fullscreen-overlay" style={{ opacity: typingFadingOut ? 0 : 1 }}>
           <div className="terminal-box">
-            {typedLines.map((line, index) => {
-              const showCursor = cursorVisible && index === cursorTargetIndex && !typingComplete;
-              return (
-                <div key={`typed-line-${index}`}>
-                  {line}
-                  {showCursor && <span className="cursor"></span>}
-                </div>
-              );
-            })}
+            {typedLines.map((line, idx) => <div key={idx}>{line}{idx === currentLineIndex && <span className="cursor"></span>}</div>)}
           </div>
         </div>
       )}
 
-      {/* FIXED UI LAYER */}
       <div className="ui-layer" style={{ 
-        position: 'absolute',
-        bottom: '12%', // Anchors above mobile address bars
-        left: 0,
-        right: 0,
-        zIndex: 100,
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
         opacity: hasAnimationCompleted && isCandleLit && appStage === 'party' ? 1 : 0, 
-        transition: 'opacity 1s ease-in-out', 
-        pointerEvents: hasAnimationCompleted && isCandleLit && appStage === 'party' ? 'auto' : 'none' 
+        pointerEvents: isCandleLit ? 'auto' : 'none',
+        display: 'flex', flexDirection: 'column', alignItems: 'center', transition: 'opacity 1s ease'
       }}>
-          <div className="hint-overlay" style={{ marginBottom: '15px' }}>Make a Wish</div>
-          <button className="wish-button" onClick={blowCandle}>Tap to Blow Candle</button>
+          <div style={{ color: 'white', marginBottom: '10px', textShadow: '0 0 10px #00ff00', textAlign: 'center' }}>
+            🕯️ Make a Wish <br/>
+            <span style={{ fontSize: '0.8rem', opacity: 0.7 }}>Blow into mic or tap button</span>
+          </div>
+          <button className="wish-button" onClick={blowCandle}>Blow Candle</button>
       </div>
       
       {(appStage === 'typing' || appStage === 'party') && (
-        <Canvas
-          gl={{ alpha: true, antialias: true, powerPreference: 'high-performance' }}
-          style={{ background: 'transparent' }}
-          onCreated={({ gl }) => { 
-              gl.setClearColor("#000000", 0); 
-              gl.shadowMap.enabled = true; 
-              gl.shadowMap.type = THREE.PCFSoftShadowMap; 
-          }}
-          shadows
-        >
+        <Canvas shadows onPointerMissed={() => { setFocusTarget(null); setActiveCardId(null); }}>
           <Suspense fallback={<Loader />}>
             <AnimatedScene 
                 isPlaying={appStage === 'party'} 
@@ -480,31 +428,17 @@ export default function App() {
                 onBackgroundFadeChange={setBackgroundOpacity} 
                 onEnvironmentProgressChange={setEnvironmentProgress} 
                 onAnimationComplete={() => setHasAnimationCompleted(true)} 
-                cards={BIRTHDAY_CARDS} 
-                activeCardId={activeCardId} 
-                onToggleCard={handleCardToggle} 
+                cards={[{ id: "confetti", image: "/card.png", position: [1, 0.081, -2], rotation: [-Math.PI / 2, 0, Math.PI / 3] }]} 
+                activeCardId={activeCardId}
+                onToggleCard={handleToggleCard}
                 fireworksActive={fireworksActive} 
+                onPhotoClick={setFocusTarget}
             />
-            <ambientLight intensity={(1 - environmentProgress) * 0.8} />
-            <directionalLight intensity={0.5 * (1 - environmentProgress)} position={[2, 10, 0]} color={[1, 0.9, 0.95]} castShadow />
-            
-            <Environment 
-                files={["/background.hdr"]} 
-                backgroundRotation={[0, 3.3, 0]} 
-                environmentRotation={[0, 3.3, 0]} 
-                blur={0.05}
-                background 
-                environmentIntensity={0.2 * environmentProgress} 
-                backgroundIntensity={0.1 * environmentProgress} 
-            />
-            
+            <FireworkFlash active={fireworksActive} envProgress={environmentProgress} />
+            <Environment files={["/background.hdr"]} background environmentIntensity={0.2 * environmentProgress} backgroundIntensity={0.1 * environmentProgress} />
             <EnvironmentBackgroundController intensity={0.1 * environmentProgress} />
-            <CinematiceCameraControls sceneStarted={appStage === 'party'} />
-            
-            <EffectComposer>
-              <Bloom luminanceThreshold={1} mipmapBlur intensity={1.5} radius={0.4} />
-              <Vignette eskil={false} offset={0.1} darkness={1.1} />
-            </EffectComposer>
+            <CinematiceCameraControls sceneStarted={appStage === 'party'} focusTarget={focusTarget} />
+            <EffectComposer><Bloom luminanceThreshold={1} mipmapBlur intensity={1.2} radius={0.3} /></EffectComposer>
           </Suspense>
         </Canvas>
       )}
