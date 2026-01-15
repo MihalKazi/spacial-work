@@ -1,5 +1,5 @@
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { Environment, OrbitControls, Html, useProgress, useGLTF, useTexture } from "@react-three/drei";
+import { Environment, OrbitControls, useProgress, useGLTF, useTexture } from "@react-three/drei";
 import { EffectComposer, Bloom } from "@react-three/postprocessing"; 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Group } from "three";
@@ -171,7 +171,7 @@ function PrepOverlay({ progress, isVisible }: { progress: number, isVisible: boo
       transition: 'opacity 0.8s ease'
     }}>
       <div style={{ color: '#0f0', fontFamily: 'monospace', textAlign: 'center' }}>
-        <div style={{ fontSize: '1.2rem', marginBottom: '10px' }}>[ HOLDUP BRO ]</div>
+        <div style={{ fontSize: '1.2rem', marginBottom: '10px' }}>[ RENDERING SCENE ]</div>
         <div style={{ width: '200px', height: '4px', background: '#113311' }}>
           <div style={{ width: `${progress}%`, height: '100%', background: '#0f0', transition: 'width 0.3s' }} />
         </div>
@@ -364,7 +364,7 @@ export default function App() {
       if (currentLineIndex >= TYPED_LINES.length) {
         setTimeout(() => {
           setTypingFadingOut(true);
-          setTimeout(() => setAppStage('preparing'), 1000); // Trigger Prep Screen
+          setTimeout(() => setAppStage('preparing'), 1000);
         }, POST_TYPING_SCENE_DELAY);
       } else {
         const timeout = setTimeout(() => {
@@ -468,7 +468,7 @@ export default function App() {
             <Environment files={["/background.hdr"]} background environmentIntensity={0.2 * environmentProgress} backgroundIntensity={0.1 * environmentProgress} />
             <EnvironmentBackgroundController intensity={0.1 * environmentProgress} />
             <CinematiceCameraControls sceneStarted={appStage === 'party'} focusTarget={focusTarget} />
-            <EffectComposer disableNormalPass>
+            <EffectComposer enableNormalPass={false}>
                 <Bloom luminanceThreshold={1} mipmapBlur intensity={1.2} radius={0.3} />
             </EffectComposer>
           </Suspense>
