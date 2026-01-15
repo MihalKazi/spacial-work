@@ -23,14 +23,12 @@ import { EarthIntro } from "./components/EarthIntro";
 import "./App.css";
 
 // --- 1. DRACO CONFIG & PRELOADING ---
-// This URL provides the decoder needed to "unzip" your compressed .glb files
 const DRACO_URL = "https://www.gstatic.com/draco/versioned/decoders/1.5.5/";
 
 useGLTF.preload("/candle.glb", DRACO_URL);
 useGLTF.preload("/cake.glb", DRACO_URL);
 useGLTF.preload("/table.glb", DRACO_URL);
 useGLTF.preload("/picture_frame.glb", DRACO_URL);
-// Note: If you renamed your compressed frame images to .webp, update these strings
 useTexture.preload("/frame1.jpg");
 useTexture.preload("/frame2.jpg");
 useTexture.preload("/frame3.jpg");
@@ -244,7 +242,6 @@ function AnimatedScene({ isPlaying, onBackgroundFadeChange, onEnvironmentProgres
         <>
             <group ref={tableGroup}>
                 <Table />
-                {/* Updated to use .jpg as per your imports, change to .webp if you renamed them */}
                 <PictureFrame image="/frame2.jpg" position={[0, 0.735, 3]} rotation={[0, 5.6, 0]} scale={0.75} />
                 <PictureFrame image="/frame3.jpg" position={[0, 0.735, -3]} rotation={[0, 4.0, 0]} scale={0.75} />
                 <PictureFrame image="/frame4.jpg" position={[-1.5, 0.735, 2.5]} rotation={[0, 5.4, 0]} scale={0.75} />
@@ -266,22 +263,39 @@ function AnimatedScene({ isPlaying, onBackgroundFadeChange, onEnvironmentProgres
 
 function CinematiceCameraControls({ sceneStarted }: { sceneStarted: boolean }) {
   const controlsRef = useRef<OrbitControlsImpl>(null);
-  const camera = useThree((state) => state.camera);
-  const size = useThree((state) => state.size); 
+  const { camera, size } = useThree();
   const [isSweeping, setIsSweeping] = useState(false);
   const sweepStartTime = useRef<number | null>(null);
   const hasSweptOnce = useRef(false);
-  const isMobile = size.width < 768;
-  const mobileOffset = isMobile ? new Vector3(0, 2, 8) : new Vector3(0, 0, 0);
-  const finalPos = useMemo(() => FINAL_CAM_POS_BASE.clone().add(mobileOffset), [isMobile]);
+
+  const isPortrait = size.height > size.width;
+
+  // Calculate position based on orientation
+  const finalPos = useMemo(() => {
+    const pos = FINAL_CAM_POS_BASE.clone();
+    if (isPortrait) {
+      // Pull back more in portrait so the table fits
+      pos.add(new Vector3(0, 2, 8));
+    }
+    return pos;
+  }, [isPortrait]);
 
   useEffect(() => {
     if (sceneStarted && !hasSweptOnce.current) {
-      setIsSweeping(true); hasSweptOnce.current = true; sweepStartTime.current = null;
-      camera.position.copy(START_CAM_POS); camera.lookAt(START_CAM_TARGET);
+      setIsSweeping(true);
+      hasSweptOnce.current = true;
+      camera.position.copy(START_CAM_POS);
+      camera.lookAt(START_CAM_TARGET);
+      
+      // Dynamic Field of View
+      if ("fov" in camera) {
+        (camera as any).fov = isPortrait ? 60 : 45;
+        (camera as any).updateProjectionMatrix();
+      }
+
       if (controlsRef.current) controlsRef.current.enabled = false;
     }
-  }, [sceneStarted, camera]);
+  }, [sceneStarted, camera, isPortrait]);
 
   useFrame(({ clock }) => {
     if (!isSweeping) return;
@@ -301,7 +315,7 @@ function CinematiceCameraControls({ sceneStarted }: { sceneStarted: boolean }) {
     }
   });
 
-  return <OrbitControls ref={controlsRef} enableDamping={!isSweeping} dampingFactor={0.05} minDistance={2} maxDistance={12} minPolarAngle={0} maxPolarAngle={Math.PI / 2} enabled={false} />;
+  return <OrbitControls ref={controlsRef} enableDamping={!isSweeping} dampingFactor={0.05} minDistance={2} maxDistance={15} maxPolarAngle={Math.PI / 2} enabled={false} />;
 }
 
 function EnvironmentBackgroundController({ intensity }: { intensity: number }) {
@@ -314,6 +328,7 @@ function EnvironmentBackgroundController({ intensity }: { intensity: number }) {
 export default function App() {
   const [appStage, setAppStage] = useState<'terminal' | 'flight' | 'typing' | 'party'>('terminal');
   const [typingFadingOut, setTypingFadingOut] = useState(false); 
+  const [showOrientationHint, setShowOrientationHint] = useState(false);
 
   const [backgroundOpacity, setBackgroundOpacity] = useState(1);
   const [environmentProgress, setEnvironmentProgress] = useState(0);
@@ -327,6 +342,16 @@ export default function App() {
   const backgroundAudioRef = useRef<HTMLAudioElement | null>(null);
   
   const { progress } = useProgress();
+
+  // Detect orientation for soft hint
+  useEffect(() => {
+    const checkOrientation = () => {
+      setShowOrientationHint(window.innerHeight > window.innerWidth);
+    };
+    checkOrientation();
+    window.addEventListener('resize', checkOrientation);
+    return () => window.removeEventListener('resize', checkOrientation);
+  }, []);
 
   const handleTerminalComplete = useCallback(() => setAppStage('flight'), []);
   
@@ -412,11 +437,12 @@ export default function App() {
 
   return (
     <div className="App">
-      <div className="landscape-warning">
-        <div className="phone-icon">📱🔄</div>
-        <h2>PLEASE ROTATE DEVICE</h2>
-        <p>For the best 3D experience, please use Landscape Mode</p>
-      </div>
+      {/* Soft Orientation Hint */}
+      {showOrientationHint && appStage === 'party' && (
+        <div className="soft-hint" onClick={() => setShowOrientationHint(false)}>
+          <span> You can rotate to see all but whatever you do is okay</span>
+        </div>
+      )}
 
       {appStage === 'terminal' && <HackerTerminal onComplete={handleTerminalComplete} />}
 
