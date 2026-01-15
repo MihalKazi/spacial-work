@@ -8,7 +8,6 @@ import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 import * as THREE from "three";
 
 // --- COMPONENTS ---
-// Make sure these files exist in your src/models or src/components folders
 import { Candle } from "./models/candle";
 import { Cake } from "./models/cake";
 import { Table } from "./models/table";
@@ -19,17 +18,16 @@ import { Moon } from "./components/Moon";
 import { Aurora } from "./components/Aurora";
 import { BirthdayCard } from "./components/BirthdayCard";
 import { GoldenText } from "./components/GoldenText"; 
-import { EarthIntro } from "./components/EarthIntro"; // The new Map Component
+import { EarthIntro } from "./components/EarthIntro"; 
 
 import "./App.css";
 
 // --- CONFIG ---
-const CURRENT_LAT = 23.8103;  // Dhaka/Ashulia
+const CURRENT_LAT = 23.8103;
 const CURRENT_LON = 90.4125;
-const TARGET_LAT = -29.6823;  // South Africa
+const TARGET_LAT = -29.6823;
 const TARGET_LON = 17.9492; 
 
-// --- HELPERS ---
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 const lerp = (from: number, to: number, t: number) => from + (to - from) * t;
 const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
@@ -63,15 +61,15 @@ const TERMINAL_SCRIPT = [
 ];
 
 const TYPED_LINES = [
-    "> ARRIVAL CONFIRMED.",
-    "> Location: Northern Cape, SA",
-    "> Hello, Abida.",
-    "> Current Date: 28 FEB 2026",
-    "> Status: SPECIAL DAY DETECTED",
-    "> Happy Birthday! 🎂",       
-    "> Initiating Surprise Protocol..."
+  "> ARRIVAL CONFIRMED.",
+  "> Location: Northern Cape, SA",
+  "> Hello, Abida.",
+  "> Current Date: 28 FEB 2026",
+  "> Status: SPECIAL DAY DETECTED",
+  "> Happy Birthday! 🎂",      
+  "> Initiating Surprise Protocol..."
 ];
-  
+
 const TYPED_CHAR_DELAY = 40;        
 const POST_TYPING_SCENE_DELAY = 3000; 
 const CURSOR_BLINK_INTERVAL = 500;
@@ -82,7 +80,6 @@ function Loader() {
   return (
     <Html center>
       <div className="text-green-500 font-mono text-center" style={{ minWidth: '300px' }}>
-        {/* FIXED: Replaced raw > with {'>'} to fix Vercel Build */}
         <div className="text-xl mb-2">{'>'} DOWNLOADING ASSETS...</div>
         <div className="text-4xl font-bold">{progress.toFixed(0)}%</div>
       </div>
@@ -103,7 +100,6 @@ function HackerTerminal({ onComplete }: { onComplete: () => void }) {
       }, 1500);
       return () => clearTimeout(readTimeout);
     }
-
     const currentLine = TERMINAL_SCRIPT[lineIndex];
     const timeout = setTimeout(() => {
       setLineIndex((prev) => prev + 1);
@@ -112,14 +108,7 @@ function HackerTerminal({ onComplete }: { onComplete: () => void }) {
   }, [lineIndex, onComplete]);
 
   return (
-    <div 
-      className="fullscreen-overlay" 
-      style={{ 
-        opacity: isExiting ? 0 : 1, 
-        transition: 'opacity 1s ease-in-out',
-        pointerEvents: isExiting ? 'none' : 'auto'
-      }}
-    >
+    <div className="fullscreen-overlay" style={{ opacity: isExiting ? 0 : 1, transition: 'opacity 1s ease-in-out', pointerEvents: isExiting ? 'none' : 'auto' }}>
       <div className="terminal-box">
         {TERMINAL_SCRIPT.slice(0, lineIndex + 1).map((line, i) => (
           <div key={i} style={{ color: line.color || '#0f0', fontWeight: line.bold ? 'bold' : 'normal' }}>
@@ -315,25 +304,19 @@ export default function App() {
   const [activeCardId, setActiveCardId] = useState<string | null>(null);
   const backgroundAudioRef = useRef<HTMLAudioElement | null>(null);
 
-  const handleTerminalComplete = useCallback(() => {
-    setAppStage((prev) => prev === 'terminal' ? 'flight' : prev);
-  }, []);
+  const handleTerminalComplete = useCallback(() => setAppStage('flight'), []);
+  const handleFlightComplete = useCallback(() => setAppStage('typing'), []);
 
-  const handleFlightComplete = useCallback(() => {
-    setAppStage((prev) => prev === 'flight' ? 'typing' : prev);
-  }, []);
-
+  // Audio initialization
   useEffect(() => {
     const audio = new Audio("/music.mp3");
-    audio.loop = true; audio.preload = "auto"; backgroundAudioRef.current = audio;
-    const playPromise = audio.play();
-    if (playPromise !== undefined) {
-      playPromise.catch(() => {
-        const startAudio = () => { audio.play().catch(() => {}); window.removeEventListener("click", startAudio); window.removeEventListener("touchstart", startAudio); window.removeEventListener("keydown", startAudio); };
-        window.addEventListener("click", startAudio); window.addEventListener("touchstart", startAudio); window.addEventListener("keydown", startAudio);
-      });
-    }
-    return () => { audio.pause(); backgroundAudioRef.current = null; };
+    audio.loop = true; 
+    audio.preload = "auto"; 
+    backgroundAudioRef.current = audio;
+    return () => {
+      audio.pause();
+      backgroundAudioRef.current = null;
+    };
   }, []);
 
   // --- DYNAMIC TYPING LOGIC ---
@@ -342,7 +325,6 @@ export default function App() {
 
   const typedLines = useMemo(() => {
     if (!isTypingStage) return [];
-    if (TYPED_LINES.length === 0) return [""];
     return TYPED_LINES.map((line, index) => {
       if (typingComplete || index < currentLineIndex) return line;
       if (index === currentLineIndex) return line.slice(0, Math.min(currentCharIndex, line.length));
@@ -355,7 +337,6 @@ export default function App() {
 
   useEffect(() => {
     if (!isTypingStage) return;
-
     if (typingComplete) {
       const suspendHandle = window.setTimeout(() => {
           setTypingFadingOut(true);
@@ -366,18 +347,15 @@ export default function App() {
       }, POST_TYPING_SCENE_DELAY);
       return () => window.clearTimeout(suspendHandle);
     }
-
     const currentLine = TYPED_LINES[currentLineIndex] ?? "";
     const handle = window.setTimeout(() => {
       if (currentCharIndex < currentLine.length) { 
         setCurrentCharIndex((prev) => prev + 1); 
-        return; 
+      } else {
+        setCurrentLineIndex((prev) => prev + 1); 
+        setCurrentCharIndex(0);
       }
-      let nextLineIndex = currentLineIndex + 1;
-      setCurrentLineIndex(nextLineIndex); 
-      setCurrentCharIndex(0);
     }, TYPED_CHAR_DELAY);
-
     return () => window.clearTimeout(handle);
   }, [currentCharIndex, currentLineIndex, typingComplete, isTypingStage]);
 
@@ -388,8 +366,11 @@ export default function App() {
 
   const blowCandle = useCallback(() => {
     if (hasAnimationCompleted && isCandleLit) {
-      setIsCandleLit(false); setFireworksActive(true);
-      if (backgroundAudioRef.current && backgroundAudioRef.current.paused) backgroundAudioRef.current.play().catch(() => {});
+      setIsCandleLit(false); 
+      setFireworksActive(true);
+      if (backgroundAudioRef.current) {
+        backgroundAudioRef.current.play().catch((err) => console.warn("Audio blocked:", err));
+      }
     }
   }, [hasAnimationCompleted, isCandleLit]);
 
@@ -397,15 +378,19 @@ export default function App() {
 
   return (
     <div className="App">
-      
-      {/* 1. HACKER TERMINAL (Intro) */}
-      {appStage === 'terminal' && (
-        <HackerTerminal onComplete={handleTerminalComplete} />
-      )}
+      {/* 0. MOBILE ROTATION WARNING */}
+      <div className="landscape-warning">
+        <div className="phone-icon">📱🔄</div>
+        <h2>PLEASE ROTATE DEVICE</h2>
+        <p>For the best 3D experience, please use Landscape Mode</p>
+      </div>
 
-      {/* 2. EARTH FLIGHT (Map) - Rendered outside Canvas */}
+      {/* 1. HACKER TERMINAL */}
+      {appStage === 'terminal' && <HackerTerminal onComplete={handleTerminalComplete} />}
+
+      {/* 2. EARTH FLIGHT */}
       {appStage === 'flight' && (
-         <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', zIndex: 10 }}>
+         <div style={{ position: 'absolute', inset: 0, zIndex: 10 }}>
             <EarthIntro 
                 startLat={CURRENT_LAT}
                 startLon={CURRENT_LON}
@@ -416,15 +401,9 @@ export default function App() {
          </div>
       )}
 
-      {/* 3. TYPING OVERLAY (Text before party) */}
+      {/* 3. TYPING OVERLAY */}
       {isTypingStage && (
-        <div 
-            className="fullscreen-overlay" 
-            style={{ 
-                opacity: typingFadingOut ? 0 : backgroundOpacity, 
-                transition: 'opacity 1s ease-in-out' 
-            }}
-        >
+        <div className="fullscreen-overlay" style={{ opacity: typingFadingOut ? 0 : backgroundOpacity, transition: 'opacity 1s ease-in-out' }}>
           <div className="terminal-box">
             {typedLines.map((line, index) => {
               const showCursor = cursorVisible && index === cursorTargetIndex && !typingComplete;
@@ -439,20 +418,13 @@ export default function App() {
         </div>
       )}
 
-      {/* 4. PARTY UI (Buttons) */}
-      <div 
-        className="ui-layer" 
-        style={{ 
-            opacity: hasAnimationCompleted && isCandleLit && appStage === 'party' ? 1 : 0,
-            transition: 'opacity 1s ease-in-out',
-            pointerEvents: hasAnimationCompleted && isCandleLit && appStage === 'party' ? 'auto' : 'none'
-        }}
-      >
+      {/* 4. PARTY UI */}
+      <div className="ui-layer" style={{ opacity: hasAnimationCompleted && isCandleLit && appStage === 'party' ? 1 : 0, transition: 'opacity 1s ease-in-out', pointerEvents: hasAnimationCompleted && isCandleLit && appStage === 'party' ? 'auto' : 'none' }}>
           <div className="hint-overlay">Make a Wish</div>
           <button className="wish-button" onClick={blowCandle}>Tap to Blow Candle</button>
       </div>
       
-      {/* 5. MAIN 3D SCENE (Only rendered when NOT in flight/terminal) */}
+      {/* 5. MAIN 3D SCENE */}
       {(appStage === 'typing' || appStage === 'party') && (
         <Canvas
           gl={{ alpha: true }}
@@ -476,17 +448,25 @@ export default function App() {
                 onToggleCard={handleCardToggle} 
                 fireworksActive={fireworksActive} 
             />
-            
             <ambientLight intensity={(1 - environmentProgress) * 0.8} />
             <directionalLight intensity={0.5 * (1 - environmentProgress)} position={[2, 10, 0]} color={[1, 0.9, 0.95]} castShadow />
-            <Environment files={["/background.exr"]} backgroundRotation={[0, 3.3, 0]} environmentRotation={[0, 3.3, 0]} background environmentIntensity={0.2 * environmentProgress} backgroundIntensity={0.1 * environmentProgress} />
+            
+            <Environment 
+                files={["/background.hdr"]} 
+                backgroundRotation={[0, 3.3, 0]} 
+                environmentRotation={[0, 3.3, 0]} 
+                background 
+                environmentIntensity={0.2 * environmentProgress} 
+                backgroundIntensity={0.1 * environmentProgress} 
+            />
+            
             <EnvironmentBackgroundController intensity={0.1 * environmentProgress} />
             <CinematiceCameraControls sceneStarted={appStage === 'party'} />
             
-           <EffectComposer>
-  <Bloom luminanceThreshold={1} mipmapBlur intensity={1.5} radius={0.4} />
-  <Vignette eskil={false} offset={0.1} darkness={1.1} />
-</EffectComposer>
+            <EffectComposer>
+              <Bloom luminanceThreshold={1} mipmapBlur intensity={1.5} radius={0.4} />
+              <Vignette eskil={false} offset={0.1} darkness={1.1} />
+            </EffectComposer>
           </Suspense>
         </Canvas>
       )}

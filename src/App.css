@@ -167,3 +167,38 @@ html, body, #root {
     width: 80%;
   }
 }
+/* Mobile Rotation Overlay - PC FRIENDLY */
+.landscape-warning {
+  display: none; /* Hidden by default on PC */
+}
+
+/* Only trigger on devices that are BOTH small AND have a touch screen (Mobile/Tablets) */
+@media screen and (max-width: 900px) and (orientation: portrait) and (pointer: coarse) {
+  .landscape-warning {
+    display: flex;
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    background: rgba(0, 0, 0, 0.95);
+    backdrop-filter: blur(15px);
+    color: #00ff00;
+    font-family: 'Courier New', monospace;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    padding: 30px;
+  }
+}
+
+.phone-icon {
+  font-size: 60px;
+  margin-bottom: 20px;
+  animation: rotatePhone 2s ease-in-out infinite;
+}
+
+@keyframes rotatePhone {
+  0% { transform: rotate(0deg); }
+  50% { transform: rotate(90deg); }
+  100% { transform: rotate(0deg); }
+}
