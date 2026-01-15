@@ -261,6 +261,7 @@ function AnimatedScene({ isPlaying, onBackgroundFadeChange, onEnvironmentProgres
     );
 }
 
+// --- UPDATED RESPONSIVE CAMERA ---
 function CinematiceCameraControls({ sceneStarted }: { sceneStarted: boolean }) {
   const controlsRef = useRef<OrbitControlsImpl>(null);
   const { camera, size } = useThree();
@@ -270,12 +271,11 @@ function CinematiceCameraControls({ sceneStarted }: { sceneStarted: boolean }) {
 
   const isPortrait = size.height > size.width;
 
-  // Calculate position based on orientation
   const finalPos = useMemo(() => {
     const pos = FINAL_CAM_POS_BASE.clone();
     if (isPortrait) {
-      // Pull back more in portrait so the table fits
-      pos.add(new Vector3(0, 2, 8));
+      // Offset position specifically for portrait aspect ratios
+      pos.add(new Vector3(2, 4, 10)); 
     }
     return pos;
   }, [isPortrait]);
@@ -285,37 +285,35 @@ function CinematiceCameraControls({ sceneStarted }: { sceneStarted: boolean }) {
       setIsSweeping(true);
       hasSweptOnce.current = true;
       camera.position.copy(START_CAM_POS);
-      camera.lookAt(START_CAM_TARGET);
       
-      // Dynamic Field of View
       if ("fov" in camera) {
-        (camera as any).fov = isPortrait ? 60 : 45;
+        // Increase FOV in portrait to ensure elements aren't cut off
+        (camera as any).fov = isPortrait ? 75 : 45;
         (camera as any).updateProjectionMatrix();
       }
-
-      if (controlsRef.current) controlsRef.current.enabled = false;
     }
   }, [sceneStarted, camera, isPortrait]);
 
   useFrame(({ clock }) => {
     if (!isSweeping) return;
     if (sweepStartTime.current === null) sweepStartTime.current = clock.elapsedTime;
-    const elapsed = clock.elapsedTime - sweepStartTime.current;
-    const progress = Math.min(elapsed / CAMERA_SWOOP_DURATION, 1);
+    const progress = Math.min((clock.elapsedTime - sweepStartTime.current) / CAMERA_SWOOP_DURATION, 1);
     const ease = easeInOutCubic(progress);
-    camera.position.copy(new Vector3().lerpVectors(START_CAM_POS, finalPos, ease));
+    
+    camera.position.lerpVectors(START_CAM_POS, finalPos, ease);
     camera.lookAt(new Vector3().lerpVectors(START_CAM_TARGET, ORBIT_TARGET, ease));
+
     if (progress >= 1) {
       setIsSweeping(false);
-      if (controlsRef.current) { 
-        controlsRef.current.enabled = true; 
-        controlsRef.current.target.copy(ORBIT_TARGET); 
-        controlsRef.current.update(); 
+      if (controlsRef.current) {
+        controlsRef.current.enabled = true;
+        controlsRef.current.target.copy(ORBIT_TARGET);
+        controlsRef.current.update();
       }
     }
   });
 
-  return <OrbitControls ref={controlsRef} enableDamping={!isSweeping} dampingFactor={0.05} minDistance={2} maxDistance={15} maxPolarAngle={Math.PI / 2} enabled={false} />;
+  return <OrbitControls ref={controlsRef} enableDamping dampingFactor={0.05} minDistance={5} maxDistance={25} maxPolarAngle={Math.PI / 2} />;
 }
 
 function EnvironmentBackgroundController({ intensity }: { intensity: number }) {
@@ -343,11 +341,8 @@ export default function App() {
   
   const { progress } = useProgress();
 
-  // Detect orientation for soft hint
   useEffect(() => {
-    const checkOrientation = () => {
-      setShowOrientationHint(window.innerHeight > window.innerWidth);
-    };
+    const checkOrientation = () => setShowOrientationHint(window.innerHeight > window.innerWidth);
     checkOrientation();
     window.addEventListener('resize', checkOrientation);
     return () => window.removeEventListener('resize', checkOrientation);
@@ -356,27 +351,19 @@ export default function App() {
   const handleTerminalComplete = useCallback(() => setAppStage('flight'), []);
   
   const handleFlightComplete = useCallback(() => {
-    if (progress >= 100) {
-      setAppStage('typing');
-    } else {
+    if (progress >= 100) setAppStage('typing');
+    else {
       const check = setInterval(() => {
-        if (progress >= 100) {
-          setAppStage('typing');
-          clearInterval(check);
-        }
+        if (progress >= 100) { setAppStage('typing'); clearInterval(check); }
       }, 100);
     }
   }, [progress]);
 
   useEffect(() => {
     const audio = new Audio("/music.mp3");
-    audio.loop = true; 
-    audio.preload = "auto"; 
+    audio.loop = true; audio.preload = "auto"; 
     backgroundAudioRef.current = audio;
-    return () => {
-      audio.pause();
-      backgroundAudioRef.current = null;
-    };
+    return () => { audio.pause(); backgroundAudioRef.current = null; };
   }, []);
 
   const isTypingStage = appStage === 'typing';
@@ -399,21 +386,14 @@ export default function App() {
     if (typingComplete) {
       const suspendHandle = window.setTimeout(() => {
           setTypingFadingOut(true);
-          setTimeout(() => {
-             setAppStage('party');
-             setTypingFadingOut(false);
-          }, 1000);
+          setTimeout(() => { setAppStage('party'); setTypingFadingOut(false); }, 1000);
       }, POST_TYPING_SCENE_DELAY);
       return () => window.clearTimeout(suspendHandle);
     }
     const currentLine = TYPED_LINES[currentLineIndex] ?? "";
     const handle = window.setTimeout(() => {
-      if (currentCharIndex < currentLine.length) { 
-        setCurrentCharIndex((prev) => prev + 1); 
-      } else {
-        setCurrentLineIndex((prev) => prev + 1); 
-        setCurrentCharIndex(0);
-      }
+      if (currentCharIndex < currentLine.length) setCurrentCharIndex((prev) => prev + 1); 
+      else { setCurrentLineIndex((prev) => prev + 1); setCurrentCharIndex(0); }
     }, TYPED_CHAR_DELAY);
     return () => window.clearTimeout(handle);
   }, [currentCharIndex, currentLineIndex, typingComplete, isTypingStage]);
@@ -425,22 +405,18 @@ export default function App() {
 
   const blowCandle = useCallback(() => {
     if (hasAnimationCompleted && isCandleLit) {
-      setIsCandleLit(false); 
-      setFireworksActive(true);
-      if (backgroundAudioRef.current) {
-        backgroundAudioRef.current.play().catch((err) => console.warn("Audio blocked:", err));
-      }
+      setIsCandleLit(false); setFireworksActive(true);
+      if (backgroundAudioRef.current) backgroundAudioRef.current.play().catch((err) => console.warn("Audio blocked:", err));
     }
   }, [hasAnimationCompleted, isCandleLit]);
 
   const handleCardToggle = useCallback((id: string) => setActiveCardId((current) => (current === id ? null : id)), []);
 
   return (
-    <div className="App">
-      {/* Soft Orientation Hint */}
+    <div className="App" style={{ height: '100dvh', width: '100vw', overflow: 'hidden', position: 'fixed' }}>
       {showOrientationHint && appStage === 'party' && (
         <div className="soft-hint" onClick={() => setShowOrientationHint(false)}>
-          <span> You can rotate to see all but whatever you do is okay</span>
+          <span>🔄 Rotate for a wider view</span>
         </div>
       )}
 
@@ -448,13 +424,7 @@ export default function App() {
 
       {appStage === 'flight' && (
          <div style={{ position: 'absolute', inset: 0, zIndex: 10 }}>
-            <EarthIntro 
-                startLat={CURRENT_LAT}
-                startLon={CURRENT_LON}
-                targetLat={TARGET_LAT} 
-                targetLon={TARGET_LON} 
-                onComplete={handleFlightComplete} 
-            />
+            <EarthIntro startLat={CURRENT_LAT} startLon={CURRENT_LON} targetLat={TARGET_LAT} targetLon={TARGET_LON} onComplete={handleFlightComplete} />
          </div>
       )}
 
@@ -474,8 +444,21 @@ export default function App() {
         </div>
       )}
 
-      <div className="ui-layer" style={{ opacity: hasAnimationCompleted && isCandleLit && appStage === 'party' ? 1 : 0, transition: 'opacity 1s ease-in-out', pointerEvents: hasAnimationCompleted && isCandleLit && appStage === 'party' ? 'auto' : 'none' }}>
-          <div className="hint-overlay">Make a Wish</div>
+      {/* FIXED UI LAYER */}
+      <div className="ui-layer" style={{ 
+        position: 'absolute',
+        bottom: '12%', // Anchors above mobile address bars
+        left: 0,
+        right: 0,
+        zIndex: 100,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        opacity: hasAnimationCompleted && isCandleLit && appStage === 'party' ? 1 : 0, 
+        transition: 'opacity 1s ease-in-out', 
+        pointerEvents: hasAnimationCompleted && isCandleLit && appStage === 'party' ? 'auto' : 'none' 
+      }}>
+          <div className="hint-overlay" style={{ marginBottom: '15px' }}>Make a Wish</div>
           <button className="wish-button" onClick={blowCandle}>Tap to Blow Candle</button>
       </div>
       
