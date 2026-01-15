@@ -7,13 +7,13 @@ const fontUrl = 'https://raw.githubusercontent.com/mrdoob/three.js/master/exampl
 
 // --- UPGRADED REALISTIC GOLD MATERIAL ---
 const goldMaterial = new THREE.MeshPhysicalMaterial({
-  color: "#FFD700",        // Base Gold
-  metalness: 1,            // Fully metallic
-  roughness: 0.15,         // Slightly rough for realistic reflections
-  clearcoat: 1,            // Varnish layer on top for extra shine
-  clearcoatRoughness: 0.1, // Polish the varnish
-  emissive: "#ffaa00",     // Inner orange glow
-  emissiveIntensity: 0.5,  // Slight glow (Bloom will amplify this!)
+  color: "#FFD700",         // Base Gold
+  metalness: 1,             // Fully metallic
+  roughness: 0.15,          // Slightly rough for realistic reflections
+  clearcoat: 1,             // Varnish layer on top for extra shine
+  clearcoatRoughness: 0.1,  // Polish the varnish
+  emissive: "#ffaa00",      // Inner orange glow
+  emissiveIntensity: 0.5,   // Slight glow
   reflectivity: 1,
 });
 
@@ -22,13 +22,14 @@ const lerp = (start: number, end: number, factor: number) => start + (end - star
 export function GoldenText({ isActive }: { isActive: boolean }) {
   const groupRef = useRef<THREE.Group>(null);
 
-  // Position
+  // Position settings
   const posX = -40; 
   const posZ = 0;   
   const startY = -40; 
   const endY = 8; 
 
-  useFrame((state, delta) => {
+  // FIX: Renamed 'state' to '_state' to satisfy TypeScript strict mode
+  useFrame((_state, delta) => {
     if (!groupRef.current) return;
 
     // 1. Position Interpolation (Rise Up)
