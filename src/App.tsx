@@ -380,6 +380,7 @@ export default function App() {
         ambientAudioRef.current.volume = 0.5; 
     }
     if (backgroundAudioRef.current) {
+      backgroundAudioRef.current.loop = true;
         backgroundAudioRef.current.volume = 0.8;
     }
   }, []);
