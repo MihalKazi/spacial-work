@@ -13,7 +13,7 @@ import { Cake } from "./models/cake";
 import { Table } from "./models/table";
 import { PictureFrame } from "./models/pictureFrame";
 import { Fireworks } from "./components/Fireworks";
-import { Glitter } from "./components/Glitter";
+import { Fireflies } from "./components/Glitter";
 import { Moon } from "./components/Moon";
 import { Aurora } from "./components/Aurora";
 import { BirthdayCard } from "./components/BirthdayCard";
@@ -51,45 +51,6 @@ const lerp = (from: number, to: number, t: number) => from + (to - from) * t;
 const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
 const easeInOutCubic = (t: number) => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 
-// --- MICROPHONE HOOK ---
-function useMicrophone(onBlow: () => void, active: boolean) {
-  useEffect(() => {
-    if (!active) return;
-    let audioContext: AudioContext;
-    let analyser: AnalyserNode;
-    let microphone: MediaStreamAudioSourceNode;
-    let animationFrame: number;
-
-    const initMic = async () => {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-        analyser = audioContext.createAnalyser();
-        microphone = audioContext.createMediaStreamSource(stream);
-        microphone.connect(analyser);
-        analyser.fftSize = 256;
-        const bufferLength = analyser.frequencyBinCount;
-        const dataArray = new Uint8Array(bufferLength);
-
-        const checkVolume = () => {
-          analyser.getByteFrequencyData(dataArray);
-          let values = 0;
-          for (let i = 0; i < bufferLength; i++) values += dataArray[i];
-          const average = values / bufferLength;
-          if (average > 55) { onBlow(); } 
-          else { animationFrame = requestAnimationFrame(checkVolume); }
-        };
-        checkVolume();
-      } catch (err) { console.warn("Mic access denied:", err); }
-    };
-    initMic();
-    return () => {
-      if (animationFrame) cancelAnimationFrame(animationFrame);
-      if (audioContext) audioContext.close();
-    };
-  }, [active, onBlow]);
-}
-
 // --- CONSTANTS ---
 const CURRENT_LAT = 23.8103;
 const CURRENT_LON = 90.4125;
@@ -117,7 +78,7 @@ const TYPED_LINES = [
   "> Hello, Abida Sultana Ety.",
   "> Current Date: 28 FEB 2026",
   "> Status: THE ALGORITHM HAS FOUND THIS AS A SPACIAL DAY.",
-  "> Happy Birthday!",      
+  "> Happy Birthday!",       
   "> Initiating Surprise Protocol..."
 ];
 
@@ -291,11 +252,14 @@ function AnimatedScene({ isPlaying, onBackgroundFadeChange, onEnvironmentProgres
                 ))}
             </group>
             <group ref={cakeGroup}><Cake /></group>
-            <group ref={candleGroup}><Candle isLit={candleLit} scale={0.5} position={[0.5, 0.5, 0.5]} rotation={[0.2, 0, -0.2]} /></group>
+            {/* Added onClick to Candle for TAP interaction */}
+            <group ref={candleGroup} onClick={(e) => { e.stopPropagation(); if(candleLit) (e as any).onBlow?.(); }}>
+                <Candle isLit={candleLit} scale={0.5} position={[0.5, 0.5, 0.5]} rotation={[0.2, 0, -0.2]} />
+            </group>
             {!candleLit && !fireworksActive && (
                 <points ref={smokeRef} position={[0, 0.8, 0]}><sphereGeometry args={[0.05, 6, 6]} /><pointsMaterial color="#ffffff" transparent opacity={0.4} size={0.03} /></points>
             )}
-            <Fireworks isActive={fireworksActive} origin={[0, 10, 0]} /><Glitter isActive={fireworksActive} /><Moon isActive={fireworksActive} /><Aurora isActive={fireworksActive} /><GoldenText isActive={fireworksActive} />
+            <Fireworks isActive={fireworksActive} origin={[0, 10, 0]} /><Fireflies isActive={fireworksActive} /><Moon isActive={fireworksActive} /><Aurora isActive={fireworksActive} /><GoldenText isActive={fireworksActive} />
         </>
     );
 }
@@ -375,12 +339,16 @@ export default function App() {
     preloadAssets();
     ambientAudioRef.current = new Audio("/ambient_night.mp3");
     backgroundAudioRef.current = new Audio("/music.mp3");
+    
+    // --- AMBIENT SETTINGS ---
     if (ambientAudioRef.current) { 
         ambientAudioRef.current.loop = true; 
         ambientAudioRef.current.volume = 0.5; 
     }
+
+    // --- MUSIC SETTINGS ---
     if (backgroundAudioRef.current) {
-      backgroundAudioRef.current.loop = true;
+        backgroundAudioRef.current.loop = true; // Looping enabled as requested
         backgroundAudioRef.current.volume = 0.8;
     }
   }, []);
@@ -448,8 +416,6 @@ export default function App() {
     }
   }, [hasAnimationCompleted, isCandleLit]);
 
-  useMicrophone(blowCandle, appStage === 'party' && isCandleLit && hasAnimationCompleted);
-
   const handlePhotoSelect = (pos: Vector3, img: string) => {
     setFocusTarget(pos);
     setActiveMemory(PHOTO_MEMORIES[img] || "Memory retrieval failed. Unknown beautiful moment.");
@@ -513,9 +479,9 @@ export default function App() {
       }}>
           <div style={{ color: 'white', marginBottom: '10px', textShadow: '0 0 10px #00ff00', textAlign: 'center' }}>
             🕯️ Make a Wish <br/>
-            <span style={{ fontSize: '0.8rem', opacity: 0.7 }}>Blow or Tap</span>
+            <span style={{ fontSize: '0.8rem', opacity: 0.7 }}>Tap to Extinguish</span>
           </div>
-          <button className="wish-button" onClick={blowCandle}>Blow Candle</button>
+          <button className="wish-button" onClick={blowCandle}>Make a Wish</button>
       </div>
       
       {(appStage === 'preparing' || appStage === 'party') && (
