@@ -1,7 +1,7 @@
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { Environment, OrbitControls, useProgress, useGLTF, useTexture } from "@react-three/drei";
 import { EffectComposer, Bloom, Glitch } from "@react-three/postprocessing"; 
-import { Suspense, useEffect, useMemo, useRef, useState } from "react"; // Removed unused useCallback
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import type { Group } from "three";
 import { Vector3 } from "three";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
@@ -80,7 +80,7 @@ const BACKGROUND_FADE_DURATION = 1.5;
 const BACKGROUND_FADE_START = Math.max((Math.max(CANDLE_DROP_START, BACKGROUND_FADE_DURATION) - BACKGROUND_FADE_DURATION), 0);
 
 const TYPED_LINES = [
-  "[GLOBAL ANNOUNCEMENT]",
+  "[INTERSTALLER DRIVE LOGS]",
   "> Coordinates Locked: Northern Cape, South Africa",
   "> Today marks a rare cosmic alignment.",
   "> A soul was born.",
@@ -93,13 +93,13 @@ const TYPED_LINES = [
 ];
 
 const TERMINAL_SCRIPT = [
-  { text: "[SYS_BOOT] KERNEL_INITIALIZE... OK", delay: 500 },
-  { text: "[0x1A4F] UPLINK_ESTABLISHED // SAT-7", delay: 800 },
-  { text: ">> ENCRYPTED_HANDSHAKE_ACCEPTED <<", delay: 1000 },
+  { text: "KERNEL_INITIALIZE... OK", delay: 500 },
+  { text: "UPLINK_ESTABLISHED", delay: 800 },
+  { text: ">> INTERSTALLER DRIVE INITIALIZED <<", delay: 1000 },
   { text: "SCANNING BIO-SIGNATURE... MATCH FOUND", delay: 1500, color: "#ffcc00" }, 
   { text: "WARN: TARGET LOCATED IN [KHULNA, BANGLADESH]", delay: 2000, color: "#ff3333" }, 
-  { text: "OVERRIDE ACCEPTED: REROUTING TO [NORTHERN CAPE, SOUTH AFRICA]", delay: 2000, color: "#00d8ff", bold: true }, 
-  { text: "INITIATING WARP DRIVE ✈️...", delay: 2500 }
+  { text: "LETS TAKE HER ELSEWHERE: REROUTING TO [NORTHERN CAPE, SOUTH AFRICA]", delay: 2000, color: "#00d8ff", bold: true }, 
+  { text: "INITIATING INTERSTALLER DRIVE ✈️...", delay: 2500 }
 ];
 
 const TYPED_CHAR_DELAY = 40;        
@@ -217,10 +217,10 @@ function AnimatedScene({ isPlaying, onBackgroundFadeChange, onEnvironmentProgres
         <>
             <group ref={tableGroup}>
                 <Table />
-                <PictureFrame image="/frame2.jpg" position={[0, 0.735, 3]} rotation={[0, 5.6, 0]} scale={0.75} onClick={(e: any) => { e.stopPropagation(); onPhotoClick(new Vector3(0, 1, 3), "/frame2.jpg"); }} />
-                <PictureFrame image="/frame3.jpg" position={[0, 0.735, -3]} rotation={[0, 4.0, 0]} scale={0.75} onClick={(e: any) => { e.stopPropagation(); onPhotoClick(new Vector3(0, 1, -3), "/frame3.jpg"); }} />
-                <PictureFrame image="/frame4.jpg" position={[-1.5, 0.735, 2.5]} rotation={[0, 5.4, 0]} scale={0.75} onClick={(e: any) => { e.stopPropagation(); onPhotoClick(new Vector3(-1.5, 1, 2.5), "/frame4.jpg"); }} />
-                <PictureFrame image="/frame1.jpg" position={[-1.5, 0.735, -2.5]} rotation={[0, 4.2, 0]} scale={0.75} onClick={(e: any) => { e.stopPropagation(); onPhotoClick(new Vector3(-1.5, 1, -2.5), "/frame1.jpg"); }} />
+                <PictureFrame image="/frame2.jpg" position={[0, 0.735, 3]} rotation={[0, 5.6, 0]} scale={0.75} onFrameClick={(img: string) => onPhotoClick(new Vector3(0, 1, 3), img)} />
+                <PictureFrame image="/frame3.jpg" position={[0, 0.735, -3]} rotation={[0, 4.0, 0]} scale={0.75} onFrameClick={(img: string) => onPhotoClick(new Vector3(0, 1, -3), img)} />
+                <PictureFrame image="/frame4.jpg" position={[-1.5, 0.735, 2.5]} rotation={[0, 5.4, 0]} scale={0.75} onFrameClick={(img: string) => onPhotoClick(new Vector3(-1.5, 1, 2.5), img)} />
+                <PictureFrame image="/frame1.jpg" position={[-1.5, 0.735, -2.5]} rotation={[0, 4.2, 0]} scale={0.75} onFrameClick={(img: string) => onPhotoClick(new Vector3(-1.5, 1, -2.5), img)} />
                 {cards.map((card: any) => <BirthdayCard key={card.id} id={card.id} image={card.image} tablePosition={card.position} tableRotation={card.rotation} isActive={activeCardId === card.id} onToggle={() => onToggleCard(card.id)} />)}
             </group>
             <group ref={cakeGroup}><Cake /></group>
@@ -284,6 +284,7 @@ export default function App() {
   const [typingFadingOut, setTypingFadingOut] = useState(false); 
   const [focusTarget, setFocusTarget] = useState<Vector3 | null>(null);
   const [activeMemory, setActiveMemory] = useState<string | null>(null);
+  const [activeLightboxImage, setActiveLightboxImage] = useState<string | null>(null); // NEW STATE
   const [typedMemory, setTypedMemory] = useState("");
   const [environmentProgress, setEnvironmentProgress] = useState(0);
   const [currentLineIndex, setCurrentLineIndex] = useState(0);
@@ -379,9 +380,11 @@ export default function App() {
     }, 2000);
   };
 
+  // UPDATED: Now triggers both the text and the high-res image overlay
   const handlePhotoSelect = (pos: Vector3, img: string) => {
     setFocusTarget(pos);
     setActiveMemory(PHOTO_MEMORIES[img] || "Memory retrieval failed. Unknown beautiful moment.");
+    setActiveLightboxImage(img);
   };
 
   return (
@@ -389,20 +392,75 @@ export default function App() {
       
       <style>{`* { cursor: crosshair !important; }`}</style>
 
+      {/* --- MOBILE RESPONSIVE INTRO SCREEN --- */}
       {appStage === 'intro' && (
         <div className="fullscreen-overlay" style={{ zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <div className="terminal-box" style={{ textAlign: 'center', border: '1px solid #00d8ff' }}>
-                <div style={{ color: '#00d8ff', marginBottom: '20px', fontFamily: 'monospace' }}></div>
-                <button onClick={handleStart} className="wish-button">RUN SurprizeProtocol.exe</button>
-            </div>
+            <button 
+                onClick={handleStart} 
+                className="wish-button" 
+                style={{ 
+                    background: 'transparent', 
+                    border: '2px solid #00d8ff', 
+                    color: '#00d8ff', 
+                    cursor: 'pointer',
+                    padding: '20px 40px',
+                    fontFamily: 'monospace',
+                    fontSize: 'clamp(1rem, 2.5vw, 1.5rem)',
+                    textTransform: 'uppercase',
+                    letterSpacing: '2px',
+                    borderRadius: '8px',
+                    boxShadow: '0 0 15px rgba(0, 255, 0, 0.2)'
+                }}
+            >
+                RUN SurprizeProtocol.exe
+            </button>
         </div>
       )}
 
+      {/* --- NEW: THE PHOTO LIGHTBOX OVERLAY --- */}
+      {activeLightboxImage && (
+        <div 
+          className="lightbox-overlay"
+          onClick={() => {
+            setActiveLightboxImage(null);
+            setActiveMemory(null);
+            setFocusTarget(null);
+          }}
+          style={{
+            position: 'fixed',
+            top: 0, left: 0, right: 0, bottom: 0,
+            backgroundColor: 'rgba(0,0,0,0.85)',
+            zIndex: 1000,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'zoom-out'
+          }}
+        >
+          <img 
+            src={activeLightboxImage} 
+            alt="Memory" 
+            style={{
+              maxHeight: '60vh', // Leaves room for the terminal text at the bottom
+              maxWidth: '90vw',
+              borderRadius: '8px',
+              boxShadow: '0 0 20px rgba(0, 255, 255, 0.3)',
+              border: '1px solid rgba(0, 255, 255, 0.2)',
+              marginBottom: '20px'
+            }} 
+          />
+          <p style={{ color: '#00d8ff', fontFamily: 'monospace', letterSpacing: '2px', fontSize: '0.8rem', opacity: 0.8 }}>
+            [ CLICK ANYWHERE TO CLOSE ]
+          </p>
+        </div>
+      )}
+
+      {/* --- UPDATED: Adjusted zIndex so it sits gracefully on top of the Lightbox --- */}
       {activeMemory && (
-        <div className="memory-overlay terminal-box" style={{ position: 'fixed', bottom: '20%', left: '50%', transform: 'translateX(-50%)', zIndex: 100, textAlign: 'center', width: '85%', maxWidth: '450px', pointerEvents: 'none' }}>
+        <div className="memory-overlay terminal-box" style={{ position: 'fixed', bottom: '15%', left: '50%', transform: 'translateX(-50%)', zIndex: 1001, textAlign: 'center', width: '85%', maxWidth: '450px', pointerEvents: 'none' }}>
           <div style={{ fontSize: '0.65rem', opacity: 0.6, marginBottom: '8px', letterSpacing: '2px' }}>[ DATA RETRIEVAL SUCCESSFUL ]</div>
           <div style={{ fontSize: '1rem', lineHeight: '1.4' }}>{typedMemory}<span className="cursor"></span></div>
-          <div style={{ fontSize: '0.6rem', marginTop: '12px', color: '#666' }}>TAP BACKGROUND TO RETURN</div>
         </div>
       )}
 
@@ -443,7 +501,7 @@ export default function App() {
           {wishStage === 'typing' && (
               <div className="terminal-box" style={{ padding: '20px', width: '90%', maxWidth: '400px' }}>
                   <div style={{ fontSize: '0.8rem', marginBottom: '10px', color: '#ffcc00', letterSpacing: '2px' }}>
-                      {"> Dont Worry it will be sent to the Stars:"}
+                      {"> Your Wish will go to the COSMOS:"}
                   </div>
                   <form onSubmit={handleWishSubmit} style={{ display: 'flex', alignItems: 'center' }}>
                       <span style={{ marginRight: '10px', color: '#00d8ff' }}>{">"}</span>
@@ -463,7 +521,7 @@ export default function App() {
 
           {wishStage === 'encrypting' && (
               <div className="terminal-box" style={{ padding: '20px', width: '90%', maxWidth: '400px', textAlign: 'center' }}>
-                  <ScrambleText text="[ ENCRYPTING WISH... SENDING TO THE STARS ]" bold color="#ff6fff" />
+                  <ScrambleText text="[ ENCRYPTING WISH... SENDING TO THE COSMOS ]" bold color="#ff6fff" />
               </div>
           )}
       </div>
@@ -473,7 +531,8 @@ export default function App() {
           shadows dpr={[1, 1.5]}
           gl={{ antialias: false, powerPreference: "high-performance", alpha: false, stencil: false, depth: true }}
           style={{ opacity: appStage === 'party' ? 1 : 0, transition: 'opacity 2s ease' }}
-          onPointerMissed={() => { setFocusTarget(null); setActiveCardId(null); setActiveMemory(null); }}
+          // UPDATED: Clear lightbox state on background tap
+          onPointerMissed={() => { setFocusTarget(null); setActiveCardId(null); setActiveMemory(null); setActiveLightboxImage(null); }}
         >
           <Suspense fallback={null}>
             <AnimatedScene 
@@ -492,7 +551,6 @@ export default function App() {
             
             <EffectComposer enableNormalPass={false} multisampling={0}>
                 <Bloom luminanceThreshold={1} mipmapBlur intensity={1.2} radius={0.3} />
-                {/* --- ALWAYS RENDER GLITCH SO TS DOES NOT COMPLAIN, JUST TOGGLE ACTIVE PROP --- */}
                 <Glitch active={isGlitching} delay={new THREE.Vector2(0, 0)} duration={new THREE.Vector2(0.2, 0.4)} strength={new THREE.Vector2(0.3, 0.8)} />
             </EffectComposer>
           </Suspense>

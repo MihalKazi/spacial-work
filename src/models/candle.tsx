@@ -1,5 +1,5 @@
 import { useFrame } from "@react-three/fiber";
-import { useGLTF } from "@react-three/drei"; // Use this instead of useLoader
+import { useGLTF } from "@react-three/drei"; 
 import type { ThreeElements } from "@react-three/fiber";
 import { useEffect, useMemo, useRef } from "react";
 import type { Group, Mesh, PointLight } from "three";
@@ -18,7 +18,7 @@ type FlameUniforms = {
   strength: IUniform<number>;
 };
 
-// --- SHADERS (Unchanged from your original code) ---
+// --- SHADERS ---
 const vertexShader = `
   uniform float time;
   varying vec2 vUv;
@@ -109,6 +109,8 @@ export function Candle({ children, isLit = true, ...groupProps }: CandleProps) {
     const elapsed = clock.elapsedTime;
     flameUniforms.time.value = elapsed;
     const targetStrength = isLit ? 1 : 0;
+    
+    // Smooth dampening for realistic fading out
     flameUniforms.strength.value = MathUtils.damp(
       flameUniforms.strength.value,
       targetStrength,
@@ -126,14 +128,19 @@ export function Candle({ children, isLit = true, ...groupProps }: CandleProps) {
       delta
     );
 
+    // Complex sine wave math for organic flame flicker
     const flicker =
       Math.sin(elapsed * 10.0) * 0.08 +
       Math.sin(elapsed * 15.3) * 0.04 +
       Math.sin(elapsed * 8.7) * 0.03;
 
     const strength = flameUniforms.strength.value;
-    light.intensity = Math.max(0, (lightStrengthRef.current * 10) + flicker * strength * 5);
-    light.position.y = 3.5 + Math.sin(elapsed * 5.0) * 0.1;
+    
+    // Adjust base intensity here (10 is good for standard lights, tweak if too bright/dim)
+    light.intensity = Math.max(0, (lightStrengthRef.current * 8) + flicker * strength * 6);
+    
+    // Subtle physical bobbing of the light source
+    light.position.y = 3.2 + Math.sin(elapsed * 5.0) * 0.05;
     light.visible = strength > 0.02;
 
     if (flameMeshRef.current) {
@@ -147,10 +154,12 @@ export function Candle({ children, isLit = true, ...groupProps }: CandleProps) {
       <mesh ref={flameMeshRef} scale={0.4} position={[0, 2.9, 0]} material={flameMaterial}>
         <sphereGeometry args={[0.5, 32, 32]} />
       </mesh>
+      
+      {/* The organic flickering point light */}
       <pointLight 
         ref={lightRef} 
-        distance={10} 
-        color="#ffcc77" 
+        distance={15} 
+        color="#ffaa33" // Warm golden/orange fire light
         decay={2} 
         castShadow 
       />

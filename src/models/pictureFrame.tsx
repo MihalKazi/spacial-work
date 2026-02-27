@@ -1,6 +1,6 @@
 import { useThree } from "@react-three/fiber";
 import type { ThreeElements } from "@react-three/fiber";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTexture, useGLTF } from "@react-three/drei";
 import {
   Box3,
@@ -18,6 +18,7 @@ type PictureFrameProps = ThreeElements["group"] & {
   imageScale?: number | [number, number];
   imageOffset?: [number, number, number];
   imageInset?: number;
+  onFrameClick?: (imageUrl: string) => void; // Added click handler prop
 };
 
 const DEFAULT_IMAGE_SCALE: [number, number] = [0.82, 0.82];
@@ -27,10 +28,12 @@ export function PictureFrame({
   imageScale = DEFAULT_IMAGE_SCALE,
   imageOffset,
   imageInset = 0.01,
+  onFrameClick,
   children,
   ...groupProps
 }: PictureFrameProps) {
   const { gl } = useThree();
+  const [hovered, setHovered] = useState(false);
   
   // 1. Load the Draco compressed frame
   const { scene } = useGLTF("/picture_frame.glb", DRACO_URL);
@@ -91,8 +94,31 @@ export function PictureFrame({
     };
   }, [pictureMaterial]);
 
+  // Change cursor to pointer on hover so she knows it's clickable
+  useEffect(() => {
+    document.body.style.cursor = hovered ? "pointer" : "auto";
+    return () => {
+      document.body.style.cursor = "auto";
+    };
+  }, [hovered]);
+
   return (
-    <group {...groupProps} dispose={null}>
+    <group 
+      {...groupProps} 
+      dispose={null}
+      onClick={(e) => {
+        e.stopPropagation(); // Prevents clicking "through" the frame onto the table
+        if (onFrameClick) onFrameClick(image);
+      }}
+      onPointerOver={(e) => {
+        e.stopPropagation();
+        setHovered(true);
+      }}
+      onPointerOut={(e) => {
+        e.stopPropagation();
+        setHovered(false);
+      }}
+    >
       {/* Grouping for the slight tilt of the frame on the table */}
       <group rotation={[0.04, 0, 0]}>
         <primitive object={frameScene} />
