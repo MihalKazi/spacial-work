@@ -19,14 +19,13 @@ html, body, #root {
 }
 
 /* --- SHARED FULLSCREEN OVERLAY --- */
-/* Used for both System Boot and Typing phases to center the card */
 .fullscreen-overlay, .background-overlay {
   position: absolute;
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
-  background: radial-gradient(circle at center, #111 0%, #000 100%);
+  background: radial-gradient(circle at center, #050a10 0%, #000 100%);
   z-index: 100;
   display: flex;
   justify-content: center;
@@ -34,35 +33,66 @@ html, body, #root {
   transition: opacity 1.0s ease-in-out;
 }
 
-/* --- THE UNIFIED TERMINAL CARD --- */
-/* Applies to both .terminal-box (Hacker) and .typed-text (Abida) */
+/* --- THE UNIFIED TERMINAL CARD (HOLOGRAPHIC CYAN & CRT FLICKER) --- */
 .terminal-box, .typed-text {
-  background: rgba(20, 20, 20, 0.75);
+  background: rgba(10, 15, 25, 0.75); /* Deep tech-blue background tint */
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(0, 255, 136, 0.2);
-  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.8), 0 0 15px rgba(0, 255, 136, 0.1);
+  border: 1px solid rgba(0, 216, 255, 0.2);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.8), inset 0 0 20px rgba(0, 216, 255, 0.1); 
   
   padding: 40px;
   border-radius: 12px;
-  color: #00ff88;
-  font-size: 1.1rem; /* Adjusted for better fit */
+  color: #00d8ff; /* Holographic Cyan */
+  font-size: 1.1rem;
   line-height: 1.6;
   white-space: pre-wrap;
   min-width: 320px;
   max-width: 85%;
   font-family: 'Courier Prime', monospace;
   
-  /* Flex layout for the terminal lists */
   display: flex;
   flex-direction: column;
   gap: 8px;
+
+  /* HACKER UPGRADES: Needed for Scanlines & Flicker */
+  position: relative; 
+  overflow: hidden;
+  animation: crtFlicker 0.15s infinite; 
 }
 
-/* Ensure individual lines inside the box look correct */
+/* --- AUTHENTIC CRT SCANLINES OVERLAY --- */
+.terminal-box::before, .typed-text::before {
+  content: " ";
+  display: block;
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  right: 0;
+  background: linear-gradient(
+    to bottom,
+    rgba(10, 15, 25, 0) 50%,
+    rgba(0, 0, 0, 0.3) 50%
+  );
+  background-size: 100% 4px;
+  z-index: 50;
+  pointer-events: none;
+  border-radius: 12px; /* Matches your box radius */
+}
+
+@keyframes crtFlicker {
+  0% { opacity: 0.98; }
+  50% { opacity: 1; }
+  100% { opacity: 0.99; }
+}
+
+/* --- ENHANCED PHOSPHOR GLOW FOR TEXT --- */
 .terminal-box div, .typed-line {
   min-height: 1.2em;
-  text-shadow: 0 0 5px rgba(0, 255, 136, 0.4);
+  text-shadow: 0 0 4px rgba(0, 216, 255, 0.6), 0 0 10px rgba(0, 216, 255, 0.2);
+  z-index: 60; /* Keeps text above scanlines */
+  position: relative;
 }
 
 /* --- CURSORS --- */
@@ -70,11 +100,13 @@ html, body, #root {
   display: inline-block;
   width: 10px;
   height: 1.2em;
-  background-color: #00ff88;
+  background-color: #00d8ff;
   margin-left: 5px;
   vertical-align: middle;
-  box-shadow: 0 0 8px rgba(0, 255, 136, 0.8);
+  box-shadow: 0 0 8px rgba(0, 216, 255, 0.8);
   animation: blink 1s step-end infinite;
+  z-index: 60;
+  position: relative;
 }
 
 @keyframes blink {
@@ -82,7 +114,7 @@ html, body, #root {
   50% { opacity: 0; }
 }
 
-/* --- CONTROLS & HINTS (Your Custom Styles) --- */
+/* --- CONTROLS & HINTS --- */
 .hint-overlay {
   position: absolute;
   bottom: 120px;
@@ -106,10 +138,10 @@ html, body, #root {
   transform: translateX(-50%);
   z-index: 100;
   
-  background: rgba(0, 255, 136, 0.1); /* Slight green tint to match theme */
+  background: rgba(0, 216, 255, 0.1);
   backdrop-filter: blur(5px);
-  border: 1px solid rgba(0, 255, 136, 0.4);
-  color: #00ff88;
+  border: 1px solid rgba(0, 216, 255, 0.4);
+  color: #00d8ff;
   padding: 14px 28px;
   border-radius: 30px;
   font-family: 'Courier Prime', monospace;
@@ -118,27 +150,27 @@ html, body, #root {
   cursor: pointer;
   text-transform: uppercase;
   letter-spacing: 1px;
-  box-shadow: 0 0 15px rgba(0, 255, 136, 0.2);
+  box-shadow: 0 0 15px rgba(0, 216, 255, 0.2);
   transition: all 0.3s ease;
   
   animation: buttonPulse 2s infinite;
 }
 
 .wish-button:hover {
-  background: rgba(0, 255, 136, 0.2);
-  box-shadow: 0 0 25px rgba(0, 255, 136, 0.4);
+  background: rgba(0, 216, 255, 0.2);
+  box-shadow: 0 0 25px rgba(0, 216, 255, 0.4);
   transform: translateX(-50%) scale(1.05);
 }
 
 .wish-button:active {
-  background: rgba(0, 255, 136, 0.3);
+  background: rgba(0, 216, 255, 0.3);
   transform: translateX(-50%) scale(0.95);
 }
 
 @keyframes buttonPulse {
-  0% { box-shadow: 0 0 10px rgba(0, 255, 136, 0.1); }
-  50% { box-shadow: 0 0 20px rgba(0, 255, 136, 0.3); }
-  100% { box-shadow: 0 0 10px rgba(0, 255, 136, 0.1); }
+  0% { box-shadow: 0 0 10px rgba(0, 216, 255, 0.1); }
+  50% { box-shadow: 0 0 20px rgba(0, 216, 255, 0.3); }
+  100% { box-shadow: 0 0 10px rgba(0, 216, 255, 0.1); }
 }
 
 @keyframes fadeInOut {
@@ -167,22 +199,22 @@ html, body, #root {
     width: 80%;
   }
 }
-/* Mobile Rotation Overlay - PC FRIENDLY */
+
+/* --- MOBILE ROTATION OVERLAY --- */
 .landscape-warning {
-  display: none; /* Hidden by default on PC */
+  display: none; 
 }
 
-/* Only trigger on devices that are BOTH small AND have a touch screen (Mobile/Tablets) */
 @media screen and (max-width: 900px) and (orientation: portrait) and (pointer: coarse) {
   .landscape-warning {
     display: flex;
     position: fixed;
     inset: 0;
     z-index: 9999;
-    background: rgba(0, 0, 0, 0.95);
+    background: rgba(0, 5, 10, 0.95); /* Deepened the background to match cyan */
     backdrop-filter: blur(15px);
-    color: #00ff00;
-    font-family: 'Courier New', monospace;
+    color: #00d8ff; 
+    font-family: 'Courier Prime', monospace; 
     flex-direction: column;
     justify-content: center;
     align-items: center;
@@ -208,12 +240,12 @@ html, body, #root {
   top: 20px;
   left: 50%;
   transform: translateX(-50%);
-  background: rgba(0, 255, 0, 0.2);
-  border: 1px solid #0f0;
-  color: #0f0;
+  background: rgba(0, 216, 255, 0.2); 
+  border: 1px solid rgba(0, 216, 255, 0.5); 
+  color: #00d8ff; 
   padding: 10px 20px;
   border-radius: 30px;
-  font-family: monospace;
+  font-family: 'Courier Prime', monospace;
   z-index: 1000;
   backdrop-filter: blur(5px);
   cursor: pointer;
