@@ -492,7 +492,7 @@ export default function App() {
               <>
                   <div style={{ color: 'white', marginBottom: '10px', textShadow: '0 0 10px #00d8ff', textAlign: 'center', fontFamily: 'monospace' }}>
                     [ SYSTEM IDLE ] <br/>
-                    <span style={{ fontSize: '0.8rem', opacity: 0.7 }}>Awaiting User Input: Extinguish Heat Source</span>
+                    <span style={{ fontSize: '0.8rem', opacity: 0.7 }}>Write anything you want Abida: Everything is for you</span>
                   </div>
                   <button className="wish-button" onClick={() => setWishStage('typing')}>MAKE A WISH</button>
               </>
