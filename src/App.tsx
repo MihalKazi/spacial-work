@@ -1,7 +1,7 @@
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { Environment, OrbitControls, useProgress, useGLTF, useTexture } from "@react-three/drei";
 import { EffectComposer, Bloom, Glitch } from "@react-three/postprocessing"; 
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react"; // Removed unused useCallback
 import type { Group } from "three";
 import { Vector3 } from "three";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
@@ -55,10 +55,10 @@ const playTerminalBlip = () => {
 
 // --- HOLODECK DATA ---
 const PHOTO_MEMORIES: Record<string, string> = {
-  "/frame1.jpg": "COSMIC ARCHIVE 01: Subject detected in her natural orbit. Observation: The universe itself aligned around her presence. Nature aligns itself around her flora and fauna flourish in her presence, drawn to her balance and beauty. ",
+  "/frame1.jpg": "COSMIC ARCHIVE 01: Subject detected in her natural orbit. Observation: The universe itself aligned around her presence. Nature aligns itself around her flora and fauna flourish in her presence, drawn to her balance and beauty.",
   "/frame2.jpg": "COSMIC ARCHIVE 02: Ocular resonance confirmed. Her gaze radiates light strong enough to stabilize chaos and ignite warmth. It sparks stars into existence.",
   "/frame3.jpg": "COSMIC ARCHIVE 03: Influence field measured. Even neighboring galaxies respond with order and harmony within her influence radius. Her laughter alone has been recorded to cause supernovae in nearby star systems.",
-  "/frame4.jpg": "COSMIC ARCHIVE 04: Temporal imprint secured. Certain moments, like her existence, resist deletion from spacetime. A parallel dimension Stalker captured her essence, fearing that without it, the cosmos might forget to honor her existence. "
+  "/frame4.jpg": "COSMIC ARCHIVE 04: Temporal imprint secured. Certain moments, like her existence, resist deletion from spacetime. A parallel dimension Stalker captured her essence, fearing that without it, the cosmos might forget to honor her existence."
 };
 
 // --- UTILS & CONSTANTS ---
@@ -91,6 +91,7 @@ const TYPED_LINES = [
   "> Celebration Protocol: ACTIVATED.",
   "> Happy Birthday, Abida Sultana Ety."
 ];
+
 const TERMINAL_SCRIPT = [
   { text: "[SYS_BOOT] KERNEL_INITIALIZE... OK", delay: 500 },
   { text: "[0x1A4F] UPLINK_ESTABLISHED // SAT-7", delay: 800 },
@@ -224,7 +225,6 @@ function AnimatedScene({ isPlaying, onBackgroundFadeChange, onEnvironmentProgres
             </group>
             <group ref={cakeGroup}><Cake /></group>
             
-            {/* Candle Tap overridden to trigger the Wish Terminal! */}
             <group ref={candleGroup} onClick={(e) => { e.stopPropagation(); if (candleLit) onCandleTap(); }}>
                 <Candle isLit={candleLit} scale={0.5} position={[0.5, 0.5, 0.5]} rotation={[0.2, 0, -0.2]} />
             </group>
@@ -293,7 +293,6 @@ export default function App() {
   const [fireworksActive, setFireworksActive] = useState(false);
   const [activeCardId, setActiveCardId] = useState<string | null>(null);
   
-  // NEW STATES: Terminal Wish & Glitch Effect
   const [wishStage, setWishStage] = useState<'idle' | 'typing' | 'encrypting' | 'done'>('idle');
   const [wishText, setWishText] = useState("");
   const [isGlitching, setIsGlitching] = useState(false);
@@ -359,17 +358,14 @@ export default function App() {
     return TYPED_LINES.map((line, idx) => idx < currentLineIndex ? line : idx === currentLineIndex ? line.slice(0, currentCharIndex) : "");
   }, [currentCharIndex, currentLineIndex, appStage]);
 
-  // --- WISH SEQUENCE UPDATE (Audio Overload Removed) ---
   const handleWishSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!wishText.trim()) return;
     setWishStage('encrypting');
 
-    // Wait for text to type out, then trigger overload glitch visually
     setTimeout(() => {
         setIsGlitching(true);
 
-        // Let it glitch for a bit, then BOOM fireworks
         setTimeout(() => {
             setIsGlitching(false);
             setIsCandleLit(false);
@@ -380,7 +376,7 @@ export default function App() {
             setFireworksActive(true);
         }, 1200);
 
-    }, 2000); // 2 seconds of "Encrypting" tension
+    }, 2000);
   };
 
   const handlePhotoSelect = (pos: Vector3, img: string) => {
@@ -391,7 +387,6 @@ export default function App() {
   return (
     <div className="App" style={{ position: 'fixed', inset: '0', width: '100%', height: '100%', overflow: 'hidden', background: '#000', touchAction: 'none' }}>
       
-      {/* Target Sci-Fi Cursor for the whole app */}
       <style>{`* { cursor: crosshair !important; }`}</style>
 
       {appStage === 'intro' && (
@@ -429,7 +424,6 @@ export default function App() {
         </div>
       )}
 
-      {/* --- NEW WISH TERMINAL UI OVERLAY --- */}
       <div className="ui-layer" style={{ 
         opacity: hasAnimationCompleted && isCandleLit && appStage === 'party' ? 1 : 0, 
         pointerEvents: isCandleLit ? 'auto' : 'none',
@@ -498,8 +492,8 @@ export default function App() {
             
             <EffectComposer enableNormalPass={false} multisampling={0}>
                 <Bloom luminanceThreshold={1} mipmapBlur intensity={1.2} radius={0.3} />
-                {/* --- THE SYSTEM OVERLOAD GLITCH EFFECT --- */}
-                {isGlitching && <Glitch active={isGlitching} delay={new THREE.Vector2(0, 0)} duration={new THREE.Vector2(0.2, 0.4)} strength={new THREE.Vector2(0.3, 0.8)} />}
+                {/* --- ALWAYS RENDER GLITCH SO TS DOES NOT COMPLAIN, JUST TOGGLE ACTIVE PROP --- */}
+                <Glitch active={isGlitching} delay={new THREE.Vector2(0, 0)} duration={new THREE.Vector2(0.2, 0.4)} strength={new THREE.Vector2(0.3, 0.8)} />
             </EffectComposer>
           </Suspense>
         </Canvas>
