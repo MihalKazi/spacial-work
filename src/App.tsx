@@ -1,6 +1,6 @@
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { Environment, OrbitControls, useProgress, useGLTF, useTexture } from "@react-three/drei";
-import { EffectComposer, Bloom, Glitch } from "@react-three/postprocessing"; 
+import { Environment, OrbitControls, useProgress, useGLTF, useTexture, useDetectGPU, PerformanceMonitor } from "@react-three/drei";
+import { EffectComposer, Bloom, Glitch } from "@react-three/postprocessing";
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import type { Group } from "three";
 import { Vector3 } from "three";
@@ -34,7 +34,7 @@ const preloadAssets = () => {
   useTexture.preload("/frame2.jpg");
   useTexture.preload("/frame3.jpg");
   useTexture.preload("/frame4.jpg");
-  useTexture.preload("/card.png");
+  useTexture.preload("/card.jpg");
 };
 
 // --- SYNTHESIZED AUDIO (Terminal Typing Only) ---
@@ -180,7 +180,7 @@ function EnvironmentBackgroundController({ intensity }: { intensity: number }) {
   return null;
 }
 
-function AnimatedScene({ isPlaying, onBackgroundFadeChange, onEnvironmentProgressChange, candleLit, onAnimationComplete, cards, activeCardId, onToggleCard, fireworksActive, onPhotoClick, onCandleTap }: any) {
+function AnimatedScene({ isPlaying, onBackgroundFadeChange, onEnvironmentProgressChange, candleLit, onAnimationComplete, cards, activeCardId, onToggleCard, fireworksActive, onPhotoClick, onCandleTap, lowQuality }: any) {
     const cakeGroup = useRef<Group>(null), tableGroup = useRef<Group>(null), candleGroup = useRef<Group>(null), smokeRef = useRef<THREE.Points>(null);
     const animationStartRef = useRef<number | null>(null), hasPrimedRef = useRef(false), hasCompletedRef = useRef(false), completionNotifiedRef = useRef(false);
     const backgroundOpacityRef = useRef(1), environmentProgressRef = useRef(0);
@@ -232,9 +232,9 @@ function AnimatedScene({ isPlaying, onBackgroundFadeChange, onEnvironmentProgres
             {!candleLit && !fireworksActive && (
                 <points ref={smokeRef} position={[0, 0.8, 0]}><sphereGeometry args={[0.05, 6, 6]} /><pointsMaterial color="#ffffff" transparent opacity={0.4} size={0.03} /></points>
             )}
-            <Fireworks isActive={fireworksActive} origin={[0, 10, 0]} />
-            <Fireflies isActive={fireworksActive} />
-            <Moon isActive={fireworksActive} />
+            <Fireworks isActive={fireworksActive} origin={[0, 10, 0]} fireworkCount={lowQuality ? 30 : 100} particlesPerFirework={lowQuality ? 8 : 10} />
+            <Fireflies isActive={fireworksActive} count={lowQuality ? 25 : 60} />
+            <Moon isActive={fireworksActive} shadowMapSize={lowQuality ? 512 : 1024} />
             <Aurora isActive={fireworksActive} />
             <GoldenText isActive={fireworksActive} />
         </>
@@ -301,7 +301,12 @@ export default function App() {
   const backgroundAudioRef = useRef<HTMLAudioElement | null>(null);
   const ambientAudioRef = useRef<HTMLAudioElement | null>(null);
   const { progress } = useProgress();
-  
+
+  const gpu = useDetectGPU();
+  const isLowTier = gpu.tier <= 1 || gpu.isMobile === true;
+  const [degraded, setDegraded] = useState(false);
+  const lowQuality = isLowTier || degraded;
+
   useEffect(() => {
     document.body.style.margin = '0';
     document.body.style.padding = '0';
@@ -527,30 +532,32 @@ export default function App() {
       </div>
       
       {(appStage === 'preparing' || appStage === 'party') && (
-        <Canvas 
-          shadows dpr={[1, 1.5]}
+        <Canvas
+          shadows={!lowQuality} dpr={lowQuality ? 1 : [1, 1.5]}
           gl={{ antialias: false, powerPreference: "high-performance", alpha: false, stencil: false, depth: true }}
           style={{ opacity: appStage === 'party' ? 1 : 0, transition: 'opacity 2s ease' }}
           // UPDATED: Clear lightbox state on background tap
           onPointerMissed={() => { setFocusTarget(null); setActiveCardId(null); setActiveMemory(null); setActiveLightboxImage(null); }}
         >
+          <PerformanceMonitor onDecline={() => setDegraded(true)} />
           <Suspense fallback={null}>
-            <AnimatedScene 
-                isPlaying={appStage === 'party'} candleLit={isCandleLit} 
-                onBackgroundFadeChange={() => {}} onEnvironmentProgressChange={setEnvironmentProgress} 
-                onAnimationComplete={() => setHasAnimationCompleted(true)} 
-                cards={[{ id: "confetti", image: "/card.png", position: [1, 0.085, -2], rotation: [-Math.PI / 2, 0, Math.PI / 3] }]} 
+            <AnimatedScene
+                isPlaying={appStage === 'party'} candleLit={isCandleLit}
+                onBackgroundFadeChange={() => {}} onEnvironmentProgressChange={setEnvironmentProgress}
+                onAnimationComplete={() => setHasAnimationCompleted(true)}
+                cards={[{ id: "confetti", image: "/card.jpg", position: [1, 0.085, -2], rotation: [-Math.PI / 2, 0, Math.PI / 3] }]}
                 activeCardId={activeCardId} onToggleCard={(id: string) => setActiveCardId(prev => (prev === id ? null : id))}
                 fireworksActive={fireworksActive} onPhotoClick={handlePhotoSelect}
                 onCandleTap={() => { if (wishStage === 'idle') setWishStage('typing'); }}
+                lowQuality={lowQuality}
             />
             <FireworkFlash active={fireworksActive} envProgress={environmentProgress} />
             <Environment preset="night" background environmentIntensity={0.2 * environmentProgress} backgroundIntensity={0.1 * environmentProgress} />
             <EnvironmentBackgroundController intensity={0.1 * environmentProgress} />
             <CinematiceCameraControls sceneStarted={appStage === 'party'} focusTarget={focusTarget} />
-            
+
             <EffectComposer enableNormalPass={false} multisampling={0}>
-                <Bloom luminanceThreshold={1} mipmapBlur intensity={1.2} radius={0.3} />
+                <Bloom luminanceThreshold={1} mipmapBlur={!lowQuality} intensity={1.2} radius={0.3} />
                 <Glitch active={isGlitching} delay={new THREE.Vector2(0, 0)} duration={new THREE.Vector2(0.2, 0.4)} strength={new THREE.Vector2(0.3, 0.8)} />
             </EffectComposer>
           </Suspense>

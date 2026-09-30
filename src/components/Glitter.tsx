@@ -23,14 +23,12 @@ function createGlowTexture() {
   return texture;
 }
 
-export function Fireflies({ isActive }: { isActive: boolean }) {
+export function Fireflies({ isActive, count = 60 }: { isActive: boolean; count?: number }) {
   const meshRef = useRef<THREE.Points>(null);
 
   // 1. Create the glow texture
   const glowTexture = useMemo(() => createGlowTexture(), []);
 
-  // Fireflies are sparse, so we use fewer particles than stars (e.g., 60 instead of 600)
-  const count = 60; 
   const area = 20;
 
   // 2. Create Particles with random starting positions and "drift" offsets

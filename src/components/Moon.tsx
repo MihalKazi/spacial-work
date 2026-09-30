@@ -24,7 +24,7 @@ const glowFragmentShader = `
 
 const lerp = (start: number, end: number, factor: number) => start + (end - start) * factor;
 
-export function Moon({ isActive }: { isActive: boolean }) {
+export function Moon({ isActive, shadowMapSize = 1024 }: { isActive: boolean; shadowMapSize?: number }) {
   const groupRef = useRef<THREE.Group>(null);
   
   // LIGHT REFERENCES
@@ -124,7 +124,7 @@ export function Moon({ isActive }: { isActive: boolean }) {
         penumbra={1}           // Maximum softness on the spotlight edges
         castShadow             // Shadows still exist...
         shadow-bias={-0.0001}
-        shadow-mapSize={[1024, 1024]} // High res shadows
+        shadow-mapSize={[shadowMapSize, shadowMapSize]}
         intensity={0}
       />
     </group>

@@ -12,11 +12,10 @@ import {
 type FireworksProps = {
   isActive: boolean;
   origin?: [number, number, number];
+  fireworkCount?: number;
+  particlesPerFirework?: number;
 };
 
-const FIREWORK_COUNT = 100;
-const PARTICLES_PER_FIREWORK = 10;
-const TOTAL_PARTICLES = FIREWORK_COUNT * PARTICLES_PER_FIREWORK;
 const GRAVITY = -4;
 
 type FireworkData = {
@@ -35,11 +34,12 @@ const randomColor = () => {
   return color;
 };
 
-export function Fireworks({ isActive, origin = [0, 5, -14] }: FireworksProps) {
+export function Fireworks({ isActive, origin = [0, 5, -14], fireworkCount = 100, particlesPerFirework = 10 }: FireworksProps) {
   const geometryRef = useRef<BufferGeometry>(null);
   const materialRef = useRef<PointsMaterial>(null);
   const dataRef = useRef<FireworkData | null>(null);
   const baseOrigin = useMemo(() => new Vector3(...origin), [origin]);
+  const TOTAL_PARTICLES = fireworkCount * particlesPerFirework;
 
   if (!dataRef.current) {
     dataRef.current = {
@@ -102,7 +102,7 @@ export function Fireworks({ isActive, origin = [0, 5, -14] }: FireworksProps) {
     for (let i = 0; i < TOTAL_PARTICLES; i += 1) {
       resetParticle(i);
     }
-  }, []);
+  }, [TOTAL_PARTICLES]);
 
   useFrame((_, delta) => {
     const geometry = geometryRef.current;

@@ -29,6 +29,7 @@ export function EarthIntro({ startLat, startLon, targetLat, targetLon, onComplet
   const [scanPct, setScanPct] = useState(0);
   const [visibleLines, setVisibleLines] = useState<string[]>([]);
   const [warpActive, setWarpActive] = useState(false);
+  const [globeReady, setGlobeReady] = useState(false);
 
   const arcData = useMemo(() => [
     {
@@ -38,38 +39,49 @@ export function EarthIntro({ startLat, startLon, targetLat, targetLon, onComplet
     }
   ], [startLat, startLon, targetLat, targetLon]);
 
+  const pointsData = useMemo(() => [
+    { lat: startLat, lng: startLon, color: '#ffcc00' },
+    { lat: targetLat, lng: targetLon, color: '#ff6fff' },
+  ], [startLat, startLon, targetLat, targetLon]);
+
+  const midLat = (startLat + targetLat) / 2;
+  const midLon = (startLon + targetLon) / 2;
+
   useEffect(() => {
-    if (!globeEl.current) return;
+    if (!globeEl.current || !globeReady) return;
 
-    // 1. Initial Camera
-    globeEl.current.pointOfView({ lat: startLat, lng: startLon, altitude: 2.5 }, 0);
-        
-    // 2. Start Flight
+    // 1. Initial Camera — start zoomed on Khulna
+    globeEl.current.pointOfView({ lat: startLat, lng: startLon, altitude: 1.6 }, 0);
+
+    // 2. Zoom OUT to reveal both locations (starts almost immediately, no dead pause)
     const timeout1 = setTimeout(() => {
-        globeEl.current?.pointOfView({ lat: targetLat, lng: targetLon, altitude: 1.5 }, 2500);
-        setWarpActive(true); 
-    }, 1000);
+        globeEl.current?.pointOfView({ lat: midLat, lng: midLon, altitude: 2.8 }, 2000);
+        setWarpActive(true);
+    }, 150);
 
-    // 3. Zoom In closer to target
+    // 3. Hold on the wide view (both pointers visible) — the one deliberate pause
     const timeout2 = setTimeout(() => {
-        globeEl.current?.pointOfView({ lat: targetLat, lng: targetLon, altitude: 0.4 }, 2000);
-        setWarpActive(false); 
-        setShowLabel(true);
-    }, 3500);
+        globeEl.current?.pointOfView({ lat: targetLat, lng: targetLon, altitude: 1.5 }, 2000);
+    }, 2850);
 
-    // 4. End Scene
+    // 4. Zoom IN close to target — chained immediately when the pan ends, no gap
     const timeout3 = setTimeout(() => {
-        onComplete();
-    }, 6000); 
+        globeEl.current?.pointOfView({ lat: targetLat, lng: targetLon, altitude: 0.4 }, 1800);
+        setWarpActive(false);
+    }, 4850);
+
+    // 5. Arrival + end scene
+    const timeout4 = setTimeout(() => setShowLabel(true), 6650);
+    const timeout5 = setTimeout(() => onComplete(), 7050);
 
     // --- HUD Progress Sync ---
-    const TOTAL_DURATION = 5500;
+    const TOTAL_DURATION = 6650;
     const startTime = Date.now();
-    
+
     const uiInterval = setInterval(() => {
         const elapsed = Date.now() - startTime;
         const progress = Math.min(elapsed / TOTAL_DURATION, 1);
-        
+
         setScanPct(Math.floor(progress * 100));
         setVisibleLines(EARTH_LINES.filter(l => l.t <= progress).map(l => l.text));
 
@@ -77,27 +89,36 @@ export function EarthIntro({ startLat, startLon, targetLat, targetLon, onComplet
     }, 50);
 
     return () => {
-        clearTimeout(timeout1); 
-        clearTimeout(timeout2); 
+        clearTimeout(timeout1);
+        clearTimeout(timeout2);
         clearTimeout(timeout3);
+        clearTimeout(timeout4);
+        clearTimeout(timeout5);
         clearInterval(uiInterval);
     };
-  }, [startLat, startLon, targetLat, targetLon, onComplete]);
+  }, [startLat, startLon, targetLat, targetLon, midLat, midLon, onComplete, globeReady]);
 
   return (
     <div style={{ width: '100vw', height: '100vh', position: 'absolute', top: 0, left: 0, background: '#000', zIndex: 50, overflow: 'hidden' }}>
-      <Globe 
-        ref={globeEl} 
-        globeImageUrl="https://unpkg.com/three-globe/example/img/earth-night.jpg" 
-        backgroundColor="#000000" 
-        arcsData={arcData} 
-        arcColor="color" 
-        arcDashLength={0.4} 
-        arcDashGap={0.2} 
-        arcDashAnimateTime={1500} 
-        arcStroke={1.5} 
-        atmosphereColor="#00d8ff" 
-        atmosphereAltitude={0.2} 
+      <Globe
+        ref={globeEl}
+        globeImageUrl="https://unpkg.com/three-globe/example/img/earth-night.jpg"
+        onGlobeReady={() => setGlobeReady(true)}
+        backgroundColor="#000000"
+        arcsData={arcData}
+        arcColor="color"
+        arcDashLength={0.4}
+        arcDashGap={0.2}
+        arcDashAnimateTime={1500}
+        arcStroke={1.5}
+        pointsData={pointsData}
+        pointLat="lat"
+        pointLng="lng"
+        pointColor="color"
+        pointAltitude={0.01}
+        pointRadius={0.4}
+        atmosphereColor="#00d8ff"
+        atmosphereAltitude={0.2}
       />
       
       {/* Overlays */}
