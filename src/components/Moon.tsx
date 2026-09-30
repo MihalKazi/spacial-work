@@ -41,7 +41,7 @@ export function Moon({ isActive, shadowMapSize = 1024 }: { isActive: boolean; sh
 
   // Position
   const startPos = new THREE.Vector3(-40, 50, 0);
-  const endPos = new THREE.Vector3(-40, 12, 0);
+  const endPos = new THREE.Vector3(-40, 17, 0);
 
   // FIX: Renamed 'state' to '_state' so TypeScript ignores it
   useFrame((_state, delta) => {
